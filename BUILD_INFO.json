@@ -1,0 +1,8 @@
+{
+  "component": "local_workshops",
+  "version": "1.0.20",
+  "numeric_version": "2026061200020",
+  "build_timestamp": "2026-06-12T00:00:00.000Z",
+  "folder": "workshops",
+  "verification": "maintenance-docs-buildinfofix-stale-zip-cleanup"
+}

@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<XMLDB PATH="local/workshops/db" VERSION="20260610" COMMENT="XMLDB file for local_workshops">
+  <TABLES>
+    <TABLE NAME="local_workshops" COMMENT="Workshop scheduling and logistics">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="workshopcode" TYPE="char" LENGTH="20" NOTNULL="true" SEQUENCE="false" COMMENT="Auto-generated workshop code"/>
+        <FIELD NAME="workshopname" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="program" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="courseid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Linked Moodle course ID"/>
+        <FIELD NAME="trainerid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Linked Moodle user ID (trainer)"/>
+        <FIELD NAME="status" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="Draft" SEQUENCE="false"/>
+        <FIELD NAME="deliverytype" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="Face-to-Face" SEQUENCE="false"/>
+        <FIELD NAME="startdatetime" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="enddatetime" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="venue" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="room" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="address" TYPE="text" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="teamslink" TYPE="text" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="webinarplatform" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false" COMMENT="Platform name e.g. Zoom, Teams, Webex"/>
+        <FIELD NAME="webinarmeetingid" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false" COMMENT="Meeting ID"/>
+        <FIELD NAME="webinarpasscode" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false" COMMENT="Meeting passcode"/>
+        <FIELD NAME="cateringrequired" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="cateringnotes" TYPE="text" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="customername" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="customercontact" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="specialrequirements" TYPE="text" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="notes" TYPE="text" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="capacity" TYPE="int" LENGTH="5" NOTNULL="false" SEQUENCE="false" COMMENT="Maximum number of participants"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="fk_courseid" TYPE="foreign" FIELDS="courseid" REFTABLE="course" REFFIELDS="id"/>
+        <KEY NAME="fk_trainerid" TYPE="foreign" FIELDS="trainerid" REFTABLE="user" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="idx_status" UNIQUE="false" FIELDS="status"/>
+        <INDEX NAME="idx_program" UNIQUE="false" FIELDS="program"/>
+        <INDEX NAME="idx_startdatetime" UNIQUE="false" FIELDS="startdatetime"/>
+        <INDEX NAME="idx_workshopcode" UNIQUE="true" FIELDS="workshopcode"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="local_workshop_participants" COMMENT="Workshop booking records">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="workshopid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="Optional Moodle user ID"/>
+        <FIELD NAME="firstname" TYPE="char" LENGTH="100" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="lastname" TYPE="char" LENGTH="100" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="email" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="organisation" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="bookingstatus" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="Booked" SEQUENCE="false"/>
+        <FIELD NAME="bookingdate" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="notes" TYPE="text" NOTNULL="false" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="fk_workshopid" TYPE="foreign" FIELDS="workshopid" REFTABLE="local_workshops" REFFIELDS="id"/>
+        <KEY NAME="fk_userid" TYPE="foreign" FIELDS="userid" REFTABLE="user" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="idx_bookingstatus" UNIQUE="false" FIELDS="bookingstatus"/>
+      </INDEXES>
+    </TABLE>
+
+    <TABLE NAME="local_workshop_documents" COMMENT="Workshop-specific documents">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="workshopid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="filename" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="filepath" TYPE="text" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="filesize" TYPE="int" LENGTH="10" NOTNULL="false" DEFAULT="0" SEQUENCE="false"/>
+        <FIELD NAME="documenttype" TYPE="char" LENGTH="50" NOTNULL="false" DEFAULT="Other" SEQUENCE="false"/>
+        <FIELD NAME="uploadedby" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="fk_workshopid" TYPE="foreign" FIELDS="workshopid" REFTABLE="local_workshops" REFFIELDS="id"/>
+        <KEY NAME="fk_uploadedby" TYPE="foreign" FIELDS="uploadedby" REFTABLE="user" REFFIELDS="id"/>
+      </KEYS>
+    </TABLE>
+
+    <TABLE NAME="local_workshop_trainers" COMMENT="Multiple trainers assigned to a workshop">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="workshopid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="userid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="fk_workshopid" TYPE="foreign" FIELDS="workshopid" REFTABLE="local_workshops" REFFIELDS="id"/>
+        <KEY NAME="fk_userid" TYPE="foreign" FIELDS="userid" REFTABLE="user" REFFIELDS="id"/>
+        <KEY NAME="uq_workshop_user" TYPE="unique" FIELDS="workshopid, userid"/>
+      </KEYS>
+    </TABLE>
+
+    <TABLE NAME="local_workshop_tasks" COMMENT="Workshop operational checklist">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="workshopid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="taskname" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="taskstatus" TYPE="char" LENGTH="20" NOTNULL="true" DEFAULT="Pending" SEQUENCE="false"/>
+        <FIELD NAME="assignedto" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false" COMMENT="User ID"/>
+        <FIELD NAME="duedate" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="completeddate" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="notes" TYPE="text" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="sortorder" TYPE="int" LENGTH="5" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="fk_workshopid" TYPE="foreign" FIELDS="workshopid" REFTABLE="local_workshops" REFFIELDS="id"/>
+        <KEY NAME="fk_assignedto" TYPE="foreign" FIELDS="assignedto" REFTABLE="user" REFFIELDS="id"/>
+      </KEYS>
+    </TABLE>
+  </TABLES>
+</XMLDB>
