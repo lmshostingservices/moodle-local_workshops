@@ -1,5 +1,28 @@
 <?php
 // This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
+/**
+ * local_workshops file.
+ *
+ * @package    local_workshops
+ * @copyright  2026 LMS-Labs
+ * @license    http://www.gnu.org/licenses/gpl-3.0.html GNU GPL v3 or later
+ */
+
+// This file is part of Moodle - http://moodle.org/
 require_once('../../config.php');
 require_once($CFG->libdir . '/adminlib.php');
 require_once($CFG->dirroot . '/local/workshops/lib.php');
@@ -26,7 +49,7 @@ $trainerrecords = $DB->get_records_sql(
      ORDER BY u.lastname, u.firstname",
     ['wid' => $id]
 );
-$trainernames = array_map(function($t) { return fullname($t); }, $trainerrecords);
+$trainernames = array_map(function ($t) { return fullname($t); }, $trainerrecords);
 $trainersdisplay = !empty($trainernames) ? implode(', ', $trainernames) : '—';
 
 // admin_externalpage_setup() anchored this page under 'Manage Workshops' and set the

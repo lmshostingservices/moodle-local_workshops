@@ -30,7 +30,6 @@ defined('MOODLE_INTERNAL') || die();
  * Listens for Moodle core events and syncs Workshop Scheduler booking statuses.
  */
 class observers {
-
     /**
      * Fired when a user completes a Moodle course.
      *

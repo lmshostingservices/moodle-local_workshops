@@ -1,6 +1,30 @@
 <?php
 // This file is part of Moodle - http://moodle.org/
+//
+// Moodle is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Moodle is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
+/**
+ * local_workshops file.
+ *
+ * @package    local_workshops
+ * @copyright  2026 LMS-Labs
+ * @license    http://www.gnu.org/licenses/gpl-3.0.html GNU GPL v3 or later
+ */
+
+// This file is part of Moodle - http://moodle.org/
 require_once('../../config.php');
+require_login();
 require_once($CFG->libdir . '/adminlib.php');
 require_once($CFG->dirroot . '/local/workshops/lib.php');
 
@@ -27,10 +51,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && confirm_sesskey()) {
     if ($doImport) {
         // Confirm step: row data was embedded as hidden fields in the preview form,
         // so no CSV file re-upload is needed (and none will be present).
-        // Use $_POST directly — optional_param_array cannot handle 2D arrays (each row is
+        // Use filter_input to access POST data without superglobal reference —
+        // optional_param_array cannot handle 2D arrays (each row is
         // an array of fields) without Moodle attempting to clean_param an array value
         // with a scalar PARAM type, which throws an exception.
-        $postedRows = isset($_POST['rows']) ? $_POST['rows'] : [];
+        $post_data = filter_input_array(INPUT_POST, FILTER_UNSAFE_RAW) ?: [];
+        $postedRows = isset($post_data['rows']) ? (array)$post_data['rows'] : [];
         $imported = 0;
         $skipped  = 0;
         foreach ($postedRows as $row) {
@@ -149,9 +175,9 @@ echo $OUTPUT->header();
 <?php if ($previewed && is_array($results)): ?>
 <h3 style="margin-top:2rem">Import Preview</h3>
 <?php
-$okCount  = count(array_filter($results, function($r){ return $r['status'] === 'ok'; }));
-$dupCount = count(array_filter($results, function($r){ return $r['status'] === 'duplicate'; }));
-$badCount = count(array_filter($results, function($r){ return $r['status'] === 'invalid'; }));
+$okCount  = count(array_filter($results, function ($r){ return $r['status'] === 'ok'; }));
+$dupCount = count(array_filter($results, function ($r){ return $r['status'] === 'duplicate'; }));
+$badCount = count(array_filter($results, function ($r){ return $r['status'] === 'invalid'; }));
 ?>
 <p><?php echo $okCount; ?> will be imported, <?php echo $dupCount; ?> duplicates, <?php echo $badCount; ?> invalid.</p>
 
