@@ -46,6 +46,34 @@ if ($hassiteconfig) {
         PARAM_TEXT
     ));
 
+    $settings->add(new admin_setting_heading(
+        'local_workshops/coursesync',
+        get_string('coursesync_heading', 'local_workshops'),
+        get_string('coursesync_heading_desc', 'local_workshops')
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
+        'local_workshops/autoenrol',
+        get_string('autoenrol', 'local_workshops'),
+        get_string('autoenrol_desc', 'local_workshops'),
+        1
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
+        'local_workshops/autocreateusers',
+        get_string('autocreateusers', 'local_workshops'),
+        get_string('autocreateusers_desc', 'local_workshops'),
+        1
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'local_workshops/attendedgroupname',
+        get_string('attendedgroupname', 'local_workshops'),
+        get_string('attendedgroupname_desc', 'local_workshops'),
+        get_string('attendedgroupname_default', 'local_workshops'),
+        PARAM_TEXT
+    ));
+
     $ADMIN->add('localplugins', $settings);
     $settings = null; // Prevent Moodle's post-include auto-add from inserting a duplicate node.
 

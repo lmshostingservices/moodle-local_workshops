@@ -183,6 +183,20 @@ if ($tab === 'participants') {
         ['wid' => $id]
     );
 
+    $wscoursecontext = null;
+    $attendedmembers = [];
+    if ($workshop->courseid && $DB->record_exists('course', ['id' => $workshop->courseid])) {
+        $wscoursecontext = context_course::instance($workshop->courseid);
+        $attgroupid = $DB->get_field('groups', 'id',
+            ['courseid' => $workshop->courseid, 'idnumber' => LOCAL_WORKSHOPS_ATTENDED_IDNUMBER]);
+        if ($attgroupid) {
+            $attendedmembers = $DB->get_records_menu('groups_members', ['groupid' => $attgroupid], '', 'userid, id');
+        }
+    } else {
+        $workshop->courseid = 0; // Linked course was deleted — treat as unlinked on this page.
+    }
+
+
     if ($canManPart) {
         echo '<div class="lw-section-actions">';
         echo '<button type="button" class="btn btn-primary btn-sm" id="lw-btn-add-participant">+ Add Participant</button>';
@@ -190,6 +204,14 @@ if ($tab === 'participants') {
             echo '<button type="button" class="btn btn-outline-primary btn-sm" id="lw-btn-enrol-group">Enrol from Group</button>';
         }
         echo '<a href="' . (new moodle_url('/local/workshops/import.php', ['workshopid' => $id]))->out() . '" class="btn btn-secondary btn-sm">Bulk Import CSV</a>';
+        if ($workshop->courseid && !empty($participants)) {
+            echo '<form method="post" action="' . (new moodle_url('/local/workshops/sync.php'))->out() . '" style="display:inline">'
+               . '<input type="hidden" name="workshopid" value="' . $id . '">'
+               . '<input type="hidden" name="sesskey" value="' . sesskey() . '">'
+               . '<button type="submit" class="btn btn-outline-primary btn-sm" '
+               . 'title="' . s(get_string('syncparticipants_help', 'local_workshops')) . '">'
+               . get_string('syncparticipants', 'local_workshops') . '</button></form>';
+        }
         if (!empty($participants)) {
             echo '<a href="' . (new moodle_url('/local/workshops/ajax.php', ['action' => 'export_participants', 'workshopid' => $id, 'sesskey' => sesskey()]))->out() . '" class="btn btn-outline-secondary btn-sm">Export CSV</a>';
         }
@@ -203,6 +225,7 @@ if ($tab === 'participants') {
         echo '<thead><tr>';
         echo '<th>Name</th><th>Email</th><th>Organisation</th>';
         echo '<th>Booking Status</th><th>Booking Date</th><th>Moodle User</th>';
+        if ($workshop->courseid) echo '<th>Course Access</th>';
         if ($canManPart) echo '<th>Actions</th>';
         echo '</tr></thead><tbody>';
 
@@ -218,11 +241,24 @@ if ($tab === 'participants') {
             echo '<td>' . local_workshops_booking_status_badge($p->bookingstatus) . '</td>';
             echo '<td>' . $bookdate . '</td>';
             echo '<td>' . $moodlelink . '</td>';
+            if ($workshop->courseid) {
+                if (!$p->userid) {
+                    $access = '<span class="text-muted">No account</span>';
+                } else if (is_enrolled($wscoursecontext, $p->userid, '', true)) {
+                    $access = '<span class="lw-badge lw-badge-bk-confirmed">Enrolled</span>';
+                    if (isset($attendedmembers[$p->userid])) {
+                        $access .= ' <span class="lw-badge lw-badge-bk-attended">Survey unlocked</span>';
+                    }
+                } else {
+                    $access = '<span class="lw-badge lw-badge-bk-cancelled">Not enrolled</span>';
+                }
+                echo '<td>' . $access . '</td>';
+            }
             if ($canManPart) {
                 echo '<td>';
                 echo '<button type="button" class="btn btn-xs btn-outline-secondary lw-edit-participant" '
-                   . 'data-id="' . $p->id . '" data-firstname="' . s($p->firstname) . '" data-lastname="' . s($p->lastname) . '"'
-                   . 'data-email="' . s($p->email) . '" data-org="' . s($p->organisation) . '"'
+                   . 'data-id="' . $p->id . '" data-firstname="' . s($p->firstname) . '" data-lastname="' . s($p->lastname) . '" '
+                   . 'data-email="' . s($p->email) . '" data-org="' . s($p->organisation) . '" '
                    . 'data-status="' . s($p->bookingstatus) . '" data-userid="' . (int)$p->userid . '">Edit</button> ';
                 echo '<button type="button" class="btn btn-xs btn-outline-danger lw-remove-participant" data-id="' . $p->id . '">Remove</button>';
                 echo '</td>';

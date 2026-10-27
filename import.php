@@ -59,6 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && confirm_sesskey()) {
         $postedRows = isset($post_data['rows']) ? (array)$post_data['rows'] : [];
         $imported = 0;
         $skipped  = 0;
+        $syncsummary = ['messages' => []];
         foreach ($postedRows as $row) {
             $rowstatus = isset($row['status']) ? $row['status'] : 'invalid';
             if ($rowstatus === 'ok') {
@@ -68,10 +69,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && confirm_sesskey()) {
                 $org       = isset($row['organisation']) ? trim($row['organisation']) : '';
                 // Re-check still valid and not a duplicate (race condition guard).
                 if (empty($email) || !validate_email($email)) { $skipped++; continue; }
-                if ($DB->record_exists('local_workshop_participants', ['workshopid' => $workshopid, 'email' => $email])) {
+                if ($DB->record_exists_select('local_workshop_participants',
+                        'workshopid = :wid AND ' . $DB->sql_equal('email', ':email', false),
+                        ['wid' => $workshopid, 'email' => $email])) {
                     $skipped++; continue;
                 }
-                $moodleuser = $DB->get_record('user', ['email' => $email, 'deleted' => 0]);
+                $moodleuser = local_workshops_find_user_by_email($email);
                 $rec = (object)[
                     'workshopid'    => $workshopid,
                     'userid'        => $moodleuser ? $moodleuser->id : null,
@@ -83,15 +86,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && confirm_sesskey()) {
                     'bookingdate'   => time(),
                     'notes'         => '',
                 ];
-                $DB->insert_record('local_workshop_participants', $rec);
+                $rec->id = $DB->insert_record('local_workshop_participants', $rec);
                 $imported++;
+
+                // Create account if needed, enrol into the linked course and workshop group.
+                $r = local_workshops_sync_participant($workshop, $rec);
+                $syncsummary[$r['code']] = ($syncsummary[$r['code']] ?? 0) + 1;
+                if (in_array($r['code'], ['nouser', 'nopermission', 'error'], true)) {
+                    $syncsummary['messages'][] = $r['message'];
+                }
             } else {
                 $skipped++;
             }
         }
         redirect(
             new moodle_url('/local/workshops/view.php', ['id' => $workshopid, 'tab' => 'participants']),
-            "Import complete: $imported imported, $skipped skipped.",
+            "Import complete: $imported imported, $skipped skipped. "
+                . ($imported ? local_workshops_sync_summary($syncsummary) : ''),
             null, \core\output\notification::NOTIFY_SUCCESS
         );
     } else {

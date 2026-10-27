@@ -232,4 +232,19 @@ $string['tabdocuments'] = 'Documents';
 $string['tabchecklist'] = 'Checklist';
 $string['tabmoodle'] = 'Moodle Info';
 
+// Course sync (v1.0.33)
+$string['coursesync_heading'] = 'Linked course access';
+$string['coursesync_heading_desc'] = 'How workshop bookings give learners access to the linked Moodle (Program) course. Each workshop gets its own group in the course; learners marked Attended are also added to a course-level "attended" group. Restrict the survey (and the assessment/certificate that follow it) to that group.';
+$string['autoenrol'] = 'Enrol bookings into the linked course';
+$string['autoenrol_desc'] = 'When a participant is Booked, Confirmed or Attended, enrol them as a Student in the workshop\'s linked course and add them to the workshop group. Cancelled, Waitlisted and No Show bookings are not enrolled. Learners are never unenrolled automatically.';
+$string['autocreateusers'] = 'Create Moodle accounts for new participants';
+$string['autocreateusers_desc'] = 'If no Moodle account exists for the participant\'s email, create one (manual authentication). Moodle emails the login details via its scheduled task and forces a password change on first login. Requires the moodle/user:create capability.';
+$string['attendedgroupname'] = 'Attended group name';
+$string['attendedgroupname_desc'] = 'Name of the group created in each linked course for learners whose booking is marked Attended. Used only when the group is first created.';
+$string['attendedgroupname_default'] = 'Attended workshop';
+$string['syncparticipants'] = 'Sync to Moodle course';
+$string['syncparticipants_help'] = 'Create missing accounts, enrol all active bookings into the linked course, and update the workshop and attended groups. Safe to run again.';
+$string['lw_alreadybooked'] = 'This email address is already booked on this workshop.';
+$string['lw_manualenroldisabled'] = 'The Manual enrolments plugin is disabled on this site, so learners cannot be enrolled automatically.';
+
 $string['privacy:metadata'] = 'The local_workshops plugin does not store any personal data.';

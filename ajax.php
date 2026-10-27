@@ -59,29 +59,34 @@ try {
                 throw new moodle_exception('invalidemail');
             }
 
-            // Look up Moodle user by email
-            $moodleuser = $DB->get_record('user', ['email' => $email, 'deleted' => 0]);
+            $workshop = $DB->get_record('local_workshops', ['id' => $workshopid], '*', MUST_EXIST);
+
+            // Link to an existing Moodle account by email (case-insensitive).
+            $moodleuser = local_workshops_find_user_by_email($email);
 
             if ($participantid > 0) {
                 // Update existing
-                $rec = $DB->get_record('local_workshop_participants', ['id' => $participantid], '*', MUST_EXIST);
+                $rec = $DB->get_record('local_workshop_participants',
+                    ['id' => $participantid, 'workshopid' => $workshopid], '*', MUST_EXIST);
+                $emailchanged = core_text::strtolower($rec->email) !== core_text::strtolower($email);
                 $rec->firstname     = $firstname;
                 $rec->lastname      = $lastname;
                 $rec->email         = $email;
                 $rec->organisation  = $organisation;
                 $rec->bookingstatus = $bookingstatus;
                 $rec->notes         = $notes;
-                $rec->userid        = $moodleuser ? $moodleuser->id : null;
-                $DB->update_record('local_workshop_participants', $rec);
-
-                // If marking as Attended, push course completion to Moodle.
-                if ($bookingstatus === 'Attended' && $moodleuser) {
-                    local_workshops_mark_course_complete($workshopid, $moodleuser->id);
+                if ($emailchanged || empty($rec->userid)) {
+                    $rec->userid = $moodleuser ? $moodleuser->id : null;
                 }
-
-                echo json_encode(['success' => true, 'message' => 'Participant updated.']);
+                $DB->update_record('local_workshop_participants', $rec);
+                $message = 'Participant updated.';
             } else {
                 // Insert new
+                if ($DB->record_exists_select('local_workshop_participants',
+                        'workshopid = :wid AND ' . $DB->sql_equal('email', ':email', false),
+                        ['wid' => $workshopid, 'email' => $email])) {
+                    throw new moodle_exception('lw_alreadybooked', 'local_workshops');
+                }
                 $rec = (object)[
                     'workshopid'    => $workshopid,
                     'userid'        => $moodleuser ? $moodleuser->id : null,
@@ -93,15 +98,17 @@ try {
                     'bookingdate'   => time(),
                     'notes'         => $notes,
                 ];
-                $newid = $DB->insert_record('local_workshop_participants', $rec);
-
-                // If creating directly as Attended, push course completion to Moodle.
-                if ($bookingstatus === 'Attended' && $moodleuser) {
-                    local_workshops_mark_course_complete($workshopid, $moodleuser->id);
-                }
-
-                echo json_encode(['success' => true, 'id' => $newid, 'message' => get_string('participantadded', 'local_workshops')]);
+                $rec->id = $DB->insert_record('local_workshop_participants', $rec);
+                $message = get_string('participantadded', 'local_workshops');
             }
+
+            // Give (or adjust) access to the linked Moodle course.
+            $sync = local_workshops_sync_participant($workshop, $rec);
+            if ($sync['code'] !== 'nocourse') {
+                $message .= ' ' . $sync['message'];
+            }
+
+            echo json_encode(['success' => true, 'id' => (int)$rec->id, 'sync' => $sync['code'], 'message' => $message]);
             break;
         }
 
@@ -111,7 +118,16 @@ try {
         case 'remove_participant': {
             require_capability('local/workshops:manageparticipants', $context);
             $participantid = required_param('participantid', PARAM_INT);
+            $removed = $DB->get_record('local_workshop_participants', ['id' => $participantid]);
             $DB->delete_records('local_workshop_participants', ['id' => $participantid]);
+            // Learners keep their course enrolment (and any progress); only the
+            // "attended" unlock is withdrawn if this was their attended booking.
+            if ($removed && $removed->userid && $removed->bookingstatus === 'Attended') {
+                $wcourse = $DB->get_field('local_workshops', 'courseid', ['id' => $removed->workshopid]);
+                if ($wcourse) {
+                    local_workshops_remove_attended((int)$wcourse, (int)$removed->userid);
+                }
+            }
             echo json_encode(['success' => true, 'message' => get_string('participantremoved', 'local_workshops')]);
             break;
         }
@@ -339,22 +355,6 @@ try {
             $added  = 0;
             $skipped = 0;
 
-            // Prepare course enrolment via manual enrolment plugin
-            $enrolplugin    = null;
-            $manualinstance = null;
-            $studentroleid  = null;
-            if ($enrolcourse && $workshop->courseid) {
-                $enrolplugin = enrol_get_plugin('manual');
-                $instances   = enrol_get_instances($workshop->courseid, true);
-                foreach ($instances as $inst) {
-                    if ($inst->enrol === 'manual') {
-                        $manualinstance = $inst;
-                        break;
-                    }
-                }
-                $studentroleid = $DB->get_field('role', 'id', ['shortname' => 'student']);
-            }
-
             foreach ($members as $u) {
                 // Skip if already a participant (by userid or by email)
                 $existsbyuser = $DB->record_exists('local_workshop_participants',
@@ -369,7 +369,7 @@ try {
                 }
 
                 // Add as workshop participant
-                $DB->insert_record('local_workshop_participants', (object)[
+                $prec = (object)[
                     'workshopid'    => $workshopid,
                     'userid'        => $u->id,
                     'firstname'     => $u->firstname,
@@ -379,20 +379,13 @@ try {
                     'bookingstatus' => $bookingstatus,
                     'bookingdate'   => time(),
                     'notes'         => 'Auto-enrolled from group: ' . $group->name,
-                ]);
+                ];
+                $prec->id = $DB->insert_record('local_workshop_participants', $prec);
                 $added++;
 
-                // Enrol into linked Moodle course if not already enrolled
-                if ($manualinstance && $enrolplugin && $studentroleid) {
-                    $isenrolled = $DB->record_exists_sql(
-                        "SELECT 1 FROM {user_enrolments} ue
-                         JOIN {enrol} e ON e.id = ue.enrolid
-                         WHERE e.courseid = :cid AND ue.userid = :uid",
-                        ['cid' => $workshop->courseid, 'uid' => $u->id]
-                    );
-                    if (!$isenrolled) {
-                        $enrolplugin->enrol_user($manualinstance, $u->id, $studentroleid);
-                    }
+                // Enrol into the linked course + workshop group (+ attended group).
+                if ($enrolcourse) {
+                    local_workshops_sync_participant($workshop, $prec);
                 }
             }
 
