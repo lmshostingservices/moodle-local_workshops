@@ -226,7 +226,11 @@ if ($tab === 'participants') {
         echo '<th>Name</th><th>Email</th><th>Organisation</th>';
         echo '<th>Booking Status</th><th>Booking Date</th><th>Moodle User</th>';
         if ($workshop->courseid) echo '<th>Course Access</th>';
-        if ($canManPart) echo '<th>Actions</th>';
+        if ($canManPart) {
+            echo '<th class="lw-actions-th">Actions '
+               . '<button type="button" class="btn btn-xs btn-success lw-btn-attendance" id="lw-btn-attendance" '
+               . 'title="Mark attendance for multiple participants at once">&#10003; Attendance</button></th>';
+        }
         echo '</tr></thead><tbody>';
 
         foreach ($participants as $p) {
@@ -315,6 +319,86 @@ if ($tab === 'participants') {
             </form>
         </div>
     </div>
+
+    <?php if (!empty($participants)):
+        $attrows = array_filter($participants, function ($p) {
+            return $p->bookingstatus !== 'Cancelled';
+        });
+        $cancelledcount = count($participants) - count($attrows);
+    ?>
+    <!-- Bulk Attendance Modal -->
+    <div id="lw-attendance-modal" class="lw-modal" style="display:none">
+        <div class="lw-modal-overlay lw-attendance-cancel"></div>
+        <div class="lw-modal-dialog lw-modal-dialog-wide">
+            <h3>Mark Attendance</h3>
+            <p class="lw-modal-desc">Tick everyone who attended. Ticked participants are set to <strong>Attended</strong>
+                <?php if ($workshop->courseid): ?>and get the survey unlocked in the linked course<?php endif; ?>.</p>
+            <?php if (empty($attrows)): ?>
+                <p class="lw-empty-notice">All bookings on this workshop are cancelled.</p>
+                <div class="lw-modal-footer">
+                    <button type="button" class="btn btn-secondary lw-attendance-cancel">Close</button>
+                </div>
+            <?php else: ?>
+            <form id="lw-attendance-form">
+                <div class="lw-att-toolbar">
+                    <button type="button" class="btn btn-xs btn-outline-primary" id="lw-att-selectall">Select all</button>
+                    <button type="button" class="btn btn-xs btn-outline-secondary" id="lw-att-selectnone">Unselect all</button>
+                    <input type="search" class="form-control form-control-sm lw-att-search" id="lw-att-search" placeholder="Filter by name, email or organisation">
+                    <span class="lw-att-count" id="lw-att-count"></span>
+                </div>
+                <div class="lw-att-list">
+                    <table class="table table-sm lw-att-table">
+                        <thead><tr>
+                            <th class="lw-att-chkcol"><input type="checkbox" id="lw-att-master" title="Select / unselect all shown"></th>
+                            <th>Name</th><th>Email</th><th>Organisation</th><th>Current status</th>
+                        </tr></thead>
+                        <tbody>
+                        <?php foreach ($attrows as $p):
+                            $search = core_text::strtolower($p->firstname . ' ' . $p->lastname . ' ' . $p->email . ' ' . $p->organisation);
+                        ?>
+                            <tr class="lw-att-row" data-search="<?php echo s($search); ?>">
+                                <td class="lw-att-chkcol">
+                                    <input type="checkbox" class="lw-att-chk" name="attended[]" value="<?php echo (int)$p->id; ?>"
+                                        id="lw-att-<?php echo (int)$p->id; ?>" data-status="<?php echo s($p->bookingstatus); ?>"
+                                        <?php echo $p->bookingstatus === 'Attended' ? 'checked' : ''; ?>>
+                                </td>
+                                <td><label for="lw-att-<?php echo (int)$p->id; ?>"><?php echo s($p->firstname . ' ' . $p->lastname); ?></label></td>
+                                <td><?php echo s($p->email); ?></td>
+                                <td><?php echo $p->organisation ? s($p->organisation) : '—'; ?></td>
+                                <td><?php echo local_workshops_booking_status_badge($p->bookingstatus); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="lw-form-row lw-att-unticked">
+                    <label for="lw-att-unticked">Participants left unticked</label>
+                    <select name="unticked" id="lw-att-unticked" class="form-control form-control-sm">
+                        <option value="unchanged">Leave their status as it is</option>
+                        <option value="noshow">Mark as No Show</option>
+                    </select>
+                    <small class="form-text text-muted">Anyone currently Attended who you untick reverts to Confirmed
+                        (or No Show if selected above).<?php if ($cancelledcount): ?>
+                        <?php echo $cancelledcount; ?> cancelled booking<?php echo $cancelledcount === 1 ? ' is' : 's are'; ?> not shown.<?php endif; ?></small>
+                </div>
+                <?php if ($workshop->courseid && get_config('local_workshops', 'attendedemail')): ?>
+                <div class="lw-form-row lw-form-check">
+                    <label>
+                        <input type="checkbox" name="sendemail" value="1" id="lw-att-sendemail" checked>
+                        <?php echo get_string('sendattendedemail', 'local_workshops'); ?>
+                    </label>
+                    <small class="form-text text-muted">Only people changing to Attended now are emailed; anyone already Attended is not emailed again.</small>
+                </div>
+                <?php endif; ?>
+                <div class="lw-modal-footer">
+                    <button type="submit" class="btn btn-primary" id="lw-att-submit">Save Attendance</button>
+                    <button type="button" class="btn btn-secondary lw-attendance-cancel">Cancel</button>
+                </div>
+            </form>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <?php if ($workshop->courseid): ?>
     <!-- Enrol from Group Modal -->

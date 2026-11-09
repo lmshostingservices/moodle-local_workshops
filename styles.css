@@ -646,3 +646,85 @@
     from { opacity: 0; transform: translateY(10px); }
     to   { opacity: 1; transform: translateY(0); }
 }
+
+/* Bulk attendance (v1.0.35) */
+.lw-actions-th {
+    white-space: nowrap;
+}
+.lw-actions-th .lw-btn-attendance {
+    margin-left: 0.4rem;
+    vertical-align: middle;
+}
+.lw-modal-dialog.lw-modal-dialog-wide {
+    max-width: 860px;
+}
+.lw-att-toolbar {
+    display: -webkit-box;
+    display: -ms-flexbox;
+    display: flex;
+    -ms-flex-wrap: wrap;
+    flex-wrap: wrap;
+    -webkit-box-align: center;
+    -ms-flex-align: center;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.6rem;
+}
+.lw-att-search {
+    -webkit-box-flex: 1;
+    -ms-flex: 1 1 220px;
+    flex: 1 1 220px;
+    min-width: 180px;
+}
+.lw-att-count {
+    font-size: 0.825rem;
+    color: #6c757d;
+    white-space: nowrap;
+}
+.lw-att-list {
+    max-height: 50vh;
+    overflow-y: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    margin-bottom: 0.875rem;
+}
+.lw-att-table {
+    margin-bottom: 0;
+    font-size: 0.875rem;
+}
+.lw-att-table thead th {
+    position: sticky;
+    top: 0;
+    background: #f8f9fa;
+    z-index: 1;
+}
+.lw-att-table td,
+.lw-att-table th {
+    vertical-align: middle;
+}
+.lw-att-table label {
+    margin: 0;
+    cursor: pointer;
+    font-weight: 400;
+}
+.lw-att-chkcol {
+    width: 2.25rem;
+    text-align: center;
+}
+.lw-att-chkcol input {
+    width: 1rem;
+    height: 1rem;
+    cursor: pointer;
+}
+.lw-att-row {
+    cursor: pointer;
+}
+.lw-att-row:hover {
+    background: #f8f9fa;
+}
+.lw-att-row.lw-att-selected {
+    background: #e8f5ee;
+}
+.lw-att-unticked select {
+    max-width: 320px;
+}

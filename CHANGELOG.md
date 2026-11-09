@@ -3,6 +3,43 @@
 All notable changes to local_workshops (Workshop Scheduler) are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [v1.0.39] - 2026-11-09
+
+### Fixed
+- Release-desk compliance: GPL header and @package/@copyright/@license tags added to db/upgrade.php; attendance email body setting uses PARAM_TEXT; `function (` spacing in view.php; BUILD_INFO.json no longer shipped in the ZIP.
+
+## [v1.0.38] - 2026-11-09
+
+### Fixed
+- Attendance email: course and site names containing "&" were sent as "&amp;" in the subject and text, and "&amp;amp;" in the HTML version. Names are now unescaped for text and escaped once for HTML.
+- Attendance email is only sent when the learner's course enrolment is active (a suspended enrolment can't open the link); the on-screen message reports it as not enrolled.
+
+## [v1.0.37] - 2026-11-09
+
+### Changed
+- Attendance email default body now reads "Here's a link to complete the survey and assessment in the course {coursename}:" followed by the course URL. On upgrade the saved body is replaced only if it still matches the v1.0.36 default.
+
+## [v1.0.36] - 2026-11-09
+
+### Added
+- **Attendance email.** When a booking changes to **Attended** (bulk Attendance, Edit/Add participant, or Enrol from Group with status Attended), the learner is emailed a link to the linked Moodle course so they can complete the survey and assessment.
+  - Sent from the site support user via Moodle's email_to_user, after the course sync, so new accounts are already created and enrolled.
+  - Only sent on a change to Attended. Not re-sent by "Sync to Moodle course" or for people already Attended. Unticking and re-ticking someone sends it again.
+  - Skipped (and reported in the on-screen message) when there's no linked course, no active Moodle account, or the learner isn't enrolled.
+  - New settings under Attendance email: on/off (default on), subject and body with placeholders {firstname}, {lastname}, {fullname}, {username}, {workshopname}, {workshopdate}, {coursename}, {courseurl}, {loginurl}, {forgotpasswordurl}, {sitename}. Defaults are set on upgrade.
+  - Bulk Attendance modal has an "Email newly attended participants the course link" tickbox (on by default) to skip emails for a batch.
+- No database schema change.
+
+## [v1.0.35] - 2026-11-09
+
+### Added
+- **Bulk attendance.** An "Attendance" button in the Actions column header of the Participants tab opens a modal listing every non-cancelled booking with a checkbox.
+  - Select all, Unselect all, a header checkbox, click-anywhere-on-row toggling, a live "x of y selected" count, and a filter box (name, email, organisation). Select/unselect act on the rows currently shown by the filter.
+  - Current Attended bookings open pre-ticked, so the modal works as an attendance register you can re-open and correct.
+  - Save: ticked participants become **Attended** (and, with a linked course, are added to the "Attended workshop" group, unlocking the survey). Unticked participants are either left as they are or marked **No Show** (with a confirmation). Unticking someone currently Attended reverts them to Confirmed (or No Show) and withdraws their survey unlock.
+  - Only changed bookings are updated and re-synced to the course. Cancelled bookings are never touched.
+- New AJAX action `bulk_attendance` (capability `local/workshops:manageparticipants`). No database schema change.
+
 ## [v1.0.34] - 2026-10-27
 
 ### Changed

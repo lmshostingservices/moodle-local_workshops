@@ -511,6 +511,85 @@ function local_workshops_sync_participant(stdClass $workshop, stdClass $particip
 }
 
 /**
+ * Email a participant who has just been marked Attended, with the link to the
+ * linked course so they can complete the survey and assessment.
+ *
+ * Call only when the status has CHANGED to Attended, after
+ * local_workshops_sync_participant() (which links/creates the account and enrols).
+ *
+ * @param stdClass $workshop    local_workshops record.
+ * @param stdClass $participant local_workshop_participants record.
+ * @return array ['code' => sent|disabled|nocourse|nouser|notenrolled|failed, 'message' => string]
+ */
+function local_workshops_send_attended_email(stdClass $workshop, stdClass $participant): array {
+    global $DB, $SITE, $CFG;
+
+    $name = trim($participant->firstname . ' ' . $participant->lastname);
+
+    if (!get_config('local_workshops', 'attendedemail')) {
+        return ['code' => 'disabled', 'message' => ''];
+    }
+    if (empty($workshop->courseid) || !($course = $DB->get_record('course', ['id' => $workshop->courseid]))) {
+        return ['code' => 'nocourse', 'message' => "$name: no linked course, attendance email not sent."];
+    }
+    $user = empty($participant->userid) ? false
+        : $DB->get_record('user', ['id' => $participant->userid, 'deleted' => 0, 'suspended' => 0]);
+    if (!$user) {
+        return ['code' => 'nouser', 'message' => "$name: no active Moodle account, attendance email not sent."];
+    }
+    $coursecontext = context_course::instance($course->id);
+    if (!is_enrolled($coursecontext, $user->id, '', true)) { // Active enrolment only: a suspended one can't open the link.
+        return ['code' => 'notenrolled', 'message' => "$name: not enrolled in the course, attendance email not sent."];
+    }
+
+    $courseurl = (new moodle_url('/course/view.php', ['id' => $course->id]))->out(false);
+    $date = $workshop->startdatetime
+        ? userdate($workshop->startdatetime, get_string('strftimedate', 'langconfig'), core_date::get_user_timezone($user))
+        : '';
+    $replace = [
+        '{firstname}'    => $user->firstname,
+        '{lastname}'     => $user->lastname,
+        '{fullname}'     => fullname($user),
+        '{username}'     => $user->username,
+        '{workshopname}' => $workshop->workshopname,
+        '{workshopdate}' => $date,
+        // escape => false: plain text for the subject/text body; s() below escapes for HTML.
+        '{coursename}'   => format_string($course->fullname, true, ['context' => $coursecontext, 'escape' => false]),
+        '{courseurl}'    => $courseurl,
+        '{loginurl}'     => (new moodle_url('/login/index.php'))->out(false),
+        '{forgotpasswordurl}' => (new moodle_url('/login/forgot_password.php'))->out(false),
+        '{sitename}'     => format_string($SITE->fullname, true, ['context' => context_system::instance(), 'escape' => false]),
+    ];
+
+    $subject = trim((string)get_config('local_workshops', 'attendedemailsubject'));
+    if ($subject === '') {
+        $subject = get_string('attendedemailsubject_default', 'local_workshops');
+    }
+    $body = trim((string)get_config('local_workshops', 'attendedemailbody'));
+    if ($body === '') {
+        $body = get_string('attendedemailbody_default', 'local_workshops');
+    }
+    $subject = strtr($subject, $replace);
+    $text    = strtr($body, $replace);
+
+    // HTML version: escape the text, then make the course/login links clickable.
+    $html = nl2br(s($text));
+    $html = preg_replace('~(https?://[^\s<]+)~', '<a href="$1">$1</a>', $html);
+
+    try {
+        $from = core_user::get_support_user();
+        $ok = email_to_user($user, $from, $subject, $text, $html);
+    } catch (Throwable $e) {
+        debugging('local_workshops attended email failed: ' . $e->getMessage(), DEBUG_DEVELOPER);
+        $ok = false;
+    }
+    if (!$ok) {
+        return ['code' => 'failed', 'message' => "$name: attendance email could not be sent."];
+    }
+    return ['code' => 'sent', 'message' => "$name: course link emailed."];
+}
+
+/**
  * Sync every booking on a workshop to its linked course.
  *
  * @param stdClass $workshop

@@ -248,3 +248,29 @@ $string['lw_alreadybooked'] = 'This email address is already booked on this work
 $string['lw_manualenroldisabled'] = 'The Manual enrolments plugin is disabled on this site, so learners cannot be enrolled automatically.';
 
 $string['privacy:metadata'] = 'The local_workshops plugin does not store any personal data.';
+
+// v1.0.35: Attended email.
+$string['attendedemail_heading'] = 'Attendance email';
+$string['attendedemail_heading_desc'] = 'When a booking changes to Attended (bulk Attendance, Edit participant, or Enrol from Group), the learner is emailed a link to the linked course so they can complete the survey and assessment. Sent only once per change to Attended, not when re-syncing. Requires a linked course and an enrolled Moodle account.';
+$string['attendedemail'] = 'Email learners when marked Attended';
+$string['attendedemail_desc'] = 'Send the email below when a participant is marked Attended.';
+$string['attendedemailsubject'] = 'Email subject';
+$string['attendedemailbody'] = 'Email body';
+$string['attendedemail_placeholders'] = 'Placeholders: {firstname}, {lastname}, {fullname}, {username}, {workshopname}, {workshopdate}, {coursename}, {courseurl}, {loginurl}, {forgotpasswordurl}, {sitename}. Plain text; links become clickable.';
+$string['attendedemailsubject_default'] = '{coursename}: complete your assessment';
+$string['attendedemailbody_default'] = 'Hi {firstname},
+
+Thank you for attending {workshopname} on {workshopdate}.
+
+Here\'s a link to complete the survey and assessment in the course {coursename}:
+
+{courseurl}
+
+Your username is: {username}
+
+If this is your first time logging in, your login details are emailed to you separately. If you have forgotten your password, you can reset it here:
+{forgotpasswordurl}
+
+Kind regards,
+{sitename}';
+$string['sendattendedemail'] = 'Email newly attended participants the course link';

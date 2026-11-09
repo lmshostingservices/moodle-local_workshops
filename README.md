@@ -6,6 +6,8 @@ Plan and run training workshops in Moodle, and give attendees access to the link
 
 - **Workshops**: name, program, linked Moodle course, trainers, dates, delivery type (Face-to-Face, Webinar, Hybrid), venue or webinar details, customer, catering, capacity and notes. Each workshop gets a code such as `WS-20261022-001`.
 - **Participants**: add one at a time, import a CSV (`firstname, lastname, email, organisation`), or add everyone from a Moodle group. Booking statuses: Booked, Confirmed, Waitlisted, Cancelled, Attended, No Show.
+- **Bulk attendance**: the **Attendance** button in the Participants table's Actions header opens a tick-list of all bookings (select all, unselect individuals, filter). Ticked people are marked Attended; unticked can be left as they are or marked No Show.
+- **Attendance email**: anyone newly marked Attended is emailed the linked course URL to complete the survey and assessment. Edit the subject and body (with placeholders) under Site administration > Plugins > Local plugins > Workshop Scheduler.
 - **Course access**: Booked, Confirmed and Attended participants are enrolled as Students in the linked course and added to a group for that workshop. If they have no Moodle account, one is created and the login details are emailed.
 - **Attendance**: marking a participant Attended adds them to the course's "Attended workshop" group. Restrict the survey to this group so it opens after the workshop.
 - **Checklist, documents and Moodle info**: an operational checklist per workshop, workshop documents, and course enrolment, completion and certificate counts.

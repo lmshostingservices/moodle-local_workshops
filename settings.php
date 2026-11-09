@@ -74,6 +74,38 @@ if ($hassiteconfig) {
         PARAM_TEXT
     ));
 
+    $settings->add(new admin_setting_heading(
+        'local_workshops/attendedemailheading',
+        get_string('attendedemail_heading', 'local_workshops'),
+        get_string('attendedemail_heading_desc', 'local_workshops')
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
+        'local_workshops/attendedemail',
+        get_string('attendedemail', 'local_workshops'),
+        get_string('attendedemail_desc', 'local_workshops'),
+        1
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'local_workshops/attendedemailsubject',
+        get_string('attendedemailsubject', 'local_workshops'),
+        get_string('attendedemail_placeholders', 'local_workshops'),
+        get_string('attendedemailsubject_default', 'local_workshops'),
+        PARAM_TEXT,
+        80
+    ));
+
+    $settings->add(new admin_setting_configtextarea(
+        'local_workshops/attendedemailbody',
+        get_string('attendedemailbody', 'local_workshops'),
+        get_string('attendedemail_placeholders', 'local_workshops'),
+        get_string('attendedemailbody_default', 'local_workshops'),
+        PARAM_TEXT,
+        80,
+        16
+    ));
+
     $ADMIN->add('localplugins', $settings);
     $settings = null; // Prevent Moodle's post-include auto-add from inserting a duplicate node.
 

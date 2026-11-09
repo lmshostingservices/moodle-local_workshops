@@ -68,6 +68,7 @@ try {
                 // Update existing
                 $rec = $DB->get_record('local_workshop_participants',
                     ['id' => $participantid, 'workshopid' => $workshopid], '*', MUST_EXIST);
+                $previousstatus = $rec->bookingstatus;
                 $emailchanged = core_text::strtolower($rec->email) !== core_text::strtolower($email);
                 $rec->firstname     = $firstname;
                 $rec->lastname      = $lastname;
@@ -82,6 +83,7 @@ try {
                 $message = 'Participant updated.';
             } else {
                 // Insert new
+                $previousstatus = '';
                 if ($DB->record_exists_select('local_workshop_participants',
                         'workshopid = :wid AND ' . $DB->sql_equal('email', ':email', false),
                         ['wid' => $workshopid, 'email' => $email])) {
@@ -108,6 +110,14 @@ try {
                 $message .= ' ' . $sync['message'];
             }
 
+            // Newly Attended: email the course link for the survey/assessment.
+            if ($rec->bookingstatus === 'Attended' && $previousstatus !== 'Attended') {
+                $mail = local_workshops_send_attended_email($workshop, $rec);
+                if ($mail['message'] !== '') {
+                    $message .= ' ' . $mail['message'];
+                }
+            }
+
             echo json_encode(['success' => true, 'id' => (int)$rec->id, 'sync' => $sync['code'], 'message' => $message]);
             break;
         }
@@ -129,6 +139,95 @@ try {
                 }
             }
             echo json_encode(['success' => true, 'message' => get_string('participantremoved', 'local_workshops')]);
+            break;
+        }
+
+        // ----------------------------------------
+        // bulk_attendance
+        // Ticked participants -> Attended.
+        // Unticked participants -> 'No Show' when unticked=noshow; otherwise left
+        // as they are, except anyone currently Attended reverts to Confirmed.
+        // Cancelled bookings are never touched.
+        // ----------------------------------------
+        case 'bulk_attendance': {
+            require_capability('local/workshops:manageparticipants', $context);
+            $workshopid = required_param('workshopid', PARAM_INT);
+            $attended   = optional_param_array('attended', [], PARAM_INT);
+            $unticked   = optional_param('unticked', 'unchanged', PARAM_ALPHA);
+            $sendemail  = optional_param('sendemail', 1, PARAM_BOOL);
+
+            $workshop = $DB->get_record('local_workshops', ['id' => $workshopid], '*', MUST_EXIST);
+            $attendedset = array_flip(array_map('intval', $attended));
+
+            core_php_time_limit::raise(300);
+
+            $participants = $DB->get_records('local_workshop_participants',
+                ['workshopid' => $workshopid], 'lastname, firstname');
+
+            $counts  = ['Attended' => 0, 'No Show' => 0, 'Confirmed' => 0];
+            $summary = ['messages' => []];
+            $changed = 0;
+            $emailed = 0;
+            $emailproblems = [];
+
+            foreach ($participants as $p) {
+                if ($p->bookingstatus === 'Cancelled') {
+                    continue;
+                }
+                if (isset($attendedset[(int)$p->id])) {
+                    $new = 'Attended';
+                } else if ($unticked === 'noshow') {
+                    $new = 'No Show';
+                } else if ($p->bookingstatus === 'Attended') {
+                    $new = 'Confirmed';
+                } else {
+                    continue;
+                }
+                if ($new === $p->bookingstatus) {
+                    continue;
+                }
+                $p->bookingstatus = $new;
+                $DB->set_field('local_workshop_participants', 'bookingstatus', $new, ['id' => $p->id]);
+                $counts[$new]++;
+                $changed++;
+
+                $r = local_workshops_sync_participant($workshop, $p);
+                $summary[$r['code']] = ($summary[$r['code']] ?? 0) + 1;
+                if (in_array($r['code'], ['nouser', 'nopermission', 'error'], true)) {
+                    $summary['messages'][] = $r['message'];
+                }
+
+                if ($new === 'Attended' && $sendemail) {
+                    $mail = local_workshops_send_attended_email($workshop, $p);
+                    if ($mail['code'] === 'sent') {
+                        $emailed++;
+                    } else if ($mail['message'] !== '') {
+                        $emailproblems[] = $mail['message'];
+                    }
+                }
+            }
+
+            if ($changed === 0) {
+                $message = 'Attendance saved. No changes.';
+            } else {
+                $parts = [];
+                if ($counts['Attended'])  { $parts[] = $counts['Attended'] . ' marked Attended'; }
+                if ($counts['No Show'])   { $parts[] = $counts['No Show'] . ' marked No Show'; }
+                if ($counts['Confirmed']) { $parts[] = $counts['Confirmed'] . ' reverted to Confirmed'; }
+                $message = 'Attendance saved: ' . implode(', ', $parts) . '.';
+                if (empty($summary['nocourse']) && empty($summary['disabled']) && !empty($summary['messages'])) {
+                    $message .= ' ' . implode(' ', array_slice($summary['messages'], 0, 5));
+                }
+                if ($emailed) {
+                    $message .= ' Course link emailed to ' . $emailed . ' participant' . ($emailed !== 1 ? 's' : '') . '.';
+                }
+                if ($emailproblems) {
+                    $message .= ' ' . implode(' ', array_slice($emailproblems, 0, 5));
+                }
+            }
+
+            echo json_encode(['success' => true, 'changed' => $changed, 'counts' => $counts,
+                'emailed' => $emailed, 'message' => $message]);
             break;
         }
 
@@ -354,6 +453,7 @@ try {
 
             $added  = 0;
             $skipped = 0;
+            $emailed = 0;
 
             foreach ($members as $u) {
                 // Skip if already a participant (by userid or by email)
@@ -387,11 +487,20 @@ try {
                 if ($enrolcourse) {
                     local_workshops_sync_participant($workshop, $prec);
                 }
+                if ($bookingstatus === 'Attended') {
+                    $mail = local_workshops_send_attended_email($workshop, $prec);
+                    if ($mail['code'] === 'sent') {
+                        $emailed++;
+                    }
+                }
             }
 
             $msg = $added . ' participant' . ($added !== 1 ? 's' : '') . ' added';
             if ($skipped > 0) {
                 $msg .= ', ' . $skipped . ' already registered (skipped)';
+            }
+            if ($emailed > 0) {
+                $msg .= ', course link emailed to ' . $emailed;
             }
             echo json_encode(['success' => true, 'added' => $added, 'skipped' => $skipped, 'message' => $msg . '.']);
             break;

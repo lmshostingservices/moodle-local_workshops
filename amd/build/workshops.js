@@ -72,6 +72,7 @@ define(['jquery'], function($) {
         // ----- PARTICIPANTS -----
         initParticipantModal();
         initGroupEnrolModal();
+        initAttendanceModal();
 
         // Remove participant
         $(document).on('click', '.lw-remove-participant', function() {
@@ -325,6 +326,133 @@ define(['jquery'], function($) {
                 setTimeout(function() { location.reload(); }, 900);
             }, function(err) {
                 $submitBtn.prop('disabled', false).text('Enrol Group');
+                showToast('Error: ' + err, 'error');
+            });
+        });
+    }
+
+    /**
+     * Set up the bulk "Attendance" modal.
+     */
+    function initAttendanceModal() {
+        var $modal = $('#lw-attendance-modal');
+        if (!$modal.length) return; // No participants — button/modal not rendered
+
+        var $form   = $('#lw-attendance-form');
+        var $submit = $('#lw-att-submit');
+        var $search = $('#lw-att-search');
+        var $master = $('#lw-att-master');
+        var initial = {};
+
+        // Remember the state the page loaded with so Cancel restores it.
+        $form.find('.lw-att-chk').each(function() {
+            initial[this.value] = this.checked;
+        });
+
+        function visibleChecks() {
+            return $form.find('.lw-att-row:visible .lw-att-chk');
+        }
+
+        function updateCount() {
+            var all      = $form.find('.lw-att-chk');
+            var selected = all.filter(':checked').length;
+            $('#lw-att-count').text(selected + ' of ' + all.length + ' selected');
+            var vis    = visibleChecks();
+            var visSel = vis.filter(':checked').length;
+            $master.prop('checked', vis.length > 0 && visSel === vis.length);
+            $master.prop('indeterminate', visSel > 0 && visSel < vis.length);
+            $form.find('.lw-att-row').each(function() {
+                $(this).toggleClass('lw-att-selected', $(this).find('.lw-att-chk').is(':checked'));
+            });
+        }
+
+        $('#lw-btn-attendance').on('click', function() {
+            $form.find('.lw-att-chk').each(function() {
+                this.checked = !!initial[this.value];
+            });
+            $search.val('');
+            $form.find('.lw-att-row').show();
+            $('#lw-att-unticked').val('unchanged');
+            $('#lw-att-sendemail').prop('checked', true);
+            updateCount();
+            $modal.show();
+            $search.trigger('focus');
+        });
+
+        $modal.on('click', '.lw-attendance-cancel', function() {
+            $modal.hide();
+        });
+
+        $(document).on('keydown', function(e) {
+            if (e.key === 'Escape' && $modal.is(':visible')) {
+                $modal.hide();
+            }
+        });
+
+        // Select / unselect act on the rows currently shown by the filter.
+        $('#lw-att-selectall').on('click', function() {
+            visibleChecks().prop('checked', true);
+            updateCount();
+        });
+        $('#lw-att-selectnone').on('click', function() {
+            visibleChecks().prop('checked', false);
+            updateCount();
+        });
+        $master.on('change', function() {
+            visibleChecks().prop('checked', this.checked);
+            updateCount();
+        });
+        $form.on('change', '.lw-att-chk', updateCount);
+
+        // Click anywhere on a row to toggle it.
+        $form.on('click', '.lw-att-row td', function(e) {
+            if ($(e.target).is('input, label')) return;
+            var chk = $(this).closest('tr').find('.lw-att-chk')[0];
+            chk.checked = !chk.checked;
+            updateCount();
+        });
+
+        $search.on('input', function() {
+            var q = $.trim($(this).val()).toLowerCase();
+            $form.find('.lw-att-row').each(function() {
+                var hay = String($(this).data('search') || '');
+                $(this).toggle(q === '' || hay.indexOf(q) !== -1);
+            });
+            updateCount();
+        });
+
+        // Stop Enter in the filter box submitting the form.
+        $search.on('keydown', function(e) {
+            if (e.key === 'Enter') e.preventDefault();
+        });
+
+        $form.on('submit', function(e) {
+            e.preventDefault();
+            var ids = [];
+            $form.find('.lw-att-chk:checked').each(function() { ids.push(this.value); });
+            var unticked = $('#lw-att-unticked').val();
+
+            if (unticked === 'noshow') {
+                var noshow = $form.find('.lw-att-chk').length - ids.length;
+                if (noshow > 0 && !confirm(noshow + ' unticked participant' + (noshow !== 1 ? 's' : '') +
+                        ' will be marked No Show. Continue?')) {
+                    return;
+                }
+            }
+
+            $submit.prop('disabled', true).text('Saving...');
+            ajaxRequest({
+                action:     'bulk_attendance',
+                workshopid: workshopId,
+                attended:   ids, // jQuery serialises as attended[]=..
+                unticked:   unticked,
+                sendemail:  ($('#lw-att-sendemail').length && !$('#lw-att-sendemail').is(':checked')) ? 0 : 1
+            }, function(resp) {
+                $modal.hide();
+                showToast(resp.message || 'Attendance saved.', 'info');
+                setTimeout(function() { location.reload(); }, 2500);
+            }, function(err) {
+                $submit.prop('disabled', false).text('Save Attendance');
                 showToast('Error: ' + err, 'error');
             });
         });

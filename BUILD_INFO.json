@@ -1,8 +1,0 @@
-{
-  "component": "local_workshops",
-  "version": "1.0.34",
-  "numeric_version": "2026102700",
-  "build_timestamp": "2026-10-27T06:25:00.000Z",
-  "folder": "workshops",
-  "verification": "packaging-docs-contract"
-}
