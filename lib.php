@@ -656,3 +656,202 @@ function local_workshops_delivery_badge($type) {
     $cls = isset($classes[$type]) ? $classes[$type] : 'lw-badge';
     return '<span class="' . $cls . '">' . htmlspecialchars($type) . '</span>';
 }
+
+/**
+ * Normalise a webinar/meeting URL typed or pasted into the workshop form.
+ *
+ * Strips the invisible characters and wrappers that come along when a link is
+ * copied from Teams/Outlook (non-breaking or zero-width spaces, surrounding
+ * whitespace, <angle brackets> or quotes), then checks it is an http(s) URL.
+ *
+ * @param string $url Raw input.
+ * @return string|null '' when empty, the cleaned URL when valid, null when invalid.
+ */
+function local_workshops_normalise_meeting_url(string $url): ?string {
+    $url = preg_replace('/[\x{00A0}\x{200B}-\x{200D}\x{2060}\x{FEFF}]/u', '', $url);
+    $url = trim((string)$url);
+    $url = trim($url, "<>\"' \t\r\n");
+    if ($url === '') {
+        return '';
+    }
+    if (!preg_match('~^https?://[^\s"\'<>]+$~i', $url)) {
+        return null;
+    }
+    if (clean_param($url, PARAM_URL) === $url || filter_var($url, FILTER_VALIDATE_URL) !== false) {
+        return $url;
+    }
+    return null;
+}
+
+/**
+ * Who to email for a booking: the linked active Moodle account, or (when the
+ * participant has no account yet) a stand-in user built from the booking's
+ * name and email address.
+ *
+ * @param stdClass $participant local_workshop_participants record.
+ * @return stdClass|null
+ */
+function local_workshops_email_recipient(stdClass $participant): ?stdClass {
+    global $DB;
+    if (!empty($participant->userid)) {
+        $user = $DB->get_record('user', ['id' => $participant->userid, 'deleted' => 0, 'suspended' => 0]);
+        if ($user) {
+            return $user;
+        }
+    }
+    if (empty($participant->email) || !validate_email($participant->email)) {
+        return null;
+    }
+    $user = clone(core_user::get_noreply_user());
+    $user->email      = $participant->email;
+    $user->firstname  = (string)$participant->firstname;
+    $user->lastname   = (string)$participant->lastname;
+    $user->username   = '';
+    $user->mailformat = 1;
+    $user->emailstop  = 0;
+    return $user;
+}
+
+/**
+ * Plain-text joining details for a workshop: meeting link/platform/ID/passcode
+ * for Webinar and Hybrid, venue/room/address for Face-to-Face and Hybrid.
+ * Empty fields are left out.
+ *
+ * @param stdClass $workshop
+ * @return string
+ */
+function local_workshops_joining_details(stdClass $workshop): string {
+    $type  = (string)$workshop->deliverytype;
+    $lines = [];
+    if ($type !== 'Face-to-Face') {
+        if (!empty($workshop->teamslink)) {
+            $lines[] = 'Join the meeting:';
+            $lines[] = $workshop->teamslink;
+        }
+        if (!empty($workshop->webinarplatform)) {
+            $lines[] = 'Platform: ' . $workshop->webinarplatform;
+        }
+        if (!empty($workshop->webinarmeetingid)) {
+            $lines[] = 'Meeting ID: ' . $workshop->webinarmeetingid;
+        }
+        if (!empty($workshop->webinarpasscode)) {
+            $lines[] = 'Passcode: ' . $workshop->webinarpasscode;
+        }
+    }
+    if ($type !== 'Webinar') {
+        if ($lines) {
+            $lines[] = '';
+        }
+        if (!empty($workshop->venue)) {
+            $lines[] = 'Venue: ' . $workshop->venue;
+        }
+        if (!empty($workshop->room)) {
+            $lines[] = 'Room: ' . $workshop->room;
+        }
+        if (!empty($workshop->address)) {
+            $lines[] = 'Address: ' . str_replace(["\r\n", "\r", "\n"], ', ', trim($workshop->address));
+        }
+    }
+    return trim(implode("\n", $lines));
+}
+
+/**
+ * Email a participant whose booking has just been Confirmed, with the date/time
+ * and joining details (meeting link, platform, meeting ID, passcode; or venue).
+ *
+ * Call only when the status has CHANGED to Confirmed (not when an Attended
+ * booking is reverted to Confirmed), after local_workshops_sync_participant().
+ * Does not need a linked course. Not sent for Webinar/Hybrid workshops that
+ * have no meeting link yet - use "Email joining details" once it is added.
+ *
+ * @param stdClass $workshop    local_workshops record.
+ * @param stdClass $participant local_workshop_participants record.
+ * @param bool     $force       Send even if the setting is off (manual resend).
+ * @return array ['code' => sent|disabled|nolink|nouser|failed, 'message' => string]
+ */
+function local_workshops_send_confirmed_email(stdClass $workshop, stdClass $participant, bool $force = false): array {
+    global $SITE;
+
+    $name = trim($participant->firstname . ' ' . $participant->lastname);
+
+    if (!$force && !get_config('local_workshops', 'confirmedemail')) {
+        return ['code' => 'disabled', 'message' => ''];
+    }
+    if ($workshop->deliverytype !== 'Face-to-Face' && empty($workshop->teamslink)) {
+        return ['code' => 'nolink',
+            'message' => "$name: confirmation email not sent - the workshop has no meeting link yet. "
+                . "Add it, then use 'Email joining details'."];
+    }
+    $user = local_workshops_email_recipient($participant);
+    if (!$user) {
+        return ['code' => 'nouser', 'message' => "$name: no valid email address, confirmation email not sent."];
+    }
+
+    $tz = core_date::get_user_timezone($user);
+    $when = '';
+    if ($workshop->startdatetime) {
+        $when = userdate($workshop->startdatetime, get_string('strftimedaydatetime', 'langconfig'), $tz);
+        if ($workshop->enddatetime) {
+            $sameday = userdate($workshop->startdatetime, '%Y%m%d', $tz) === userdate($workshop->enddatetime, '%Y%m%d', $tz);
+            $when .= ' - ' . userdate($workshop->enddatetime,
+                get_string($sameday ? 'strftimetime' : 'strftimedaydatetime', 'langconfig'), $tz);
+        }
+        $when .= ' (' . core_date::get_localised_timezone($tz) . ')';
+    }
+
+    $coursename = '';
+    $courseurl  = '';
+    global $DB;
+    if (!empty($workshop->courseid) && ($course = $DB->get_record('course', ['id' => $workshop->courseid]))) {
+        $coursename = format_string($course->fullname, true,
+            ['context' => context_course::instance($course->id), 'escape' => false]);
+        $courseurl = (new moodle_url('/course/view.php', ['id' => $course->id]))->out(false);
+    }
+
+    $replace = [
+        '{firstname}'      => $user->firstname,
+        '{lastname}'       => $user->lastname,
+        '{fullname}'       => trim($user->firstname . ' ' . $user->lastname),
+        '{username}'       => (string)$user->username,
+        '{workshopname}'   => $workshop->workshopname,
+        '{workshopdate}'   => $workshop->startdatetime
+            ? userdate($workshop->startdatetime, get_string('strftimedate', 'langconfig'), $tz) : '',
+        '{workshopwhen}'   => $when,
+        '{joiningdetails}' => local_workshops_joining_details($workshop),
+        '{meetingurl}'     => (string)$workshop->teamslink,
+        '{platform}'       => (string)$workshop->webinarplatform,
+        '{meetingid}'      => (string)$workshop->webinarmeetingid,
+        '{passcode}'       => (string)$workshop->webinarpasscode,
+        '{coursename}'     => $coursename,
+        '{courseurl}'      => $courseurl,
+        '{loginurl}'       => (new moodle_url('/login/index.php'))->out(false),
+        '{sitename}'       => format_string($SITE->fullname, true,
+            ['context' => context_system::instance(), 'escape' => false]),
+    ];
+
+    $subject = trim((string)get_config('local_workshops', 'confirmedemailsubject'));
+    if ($subject === '') {
+        $subject = get_string('confirmedemailsubject_default', 'local_workshops');
+    }
+    $body = trim((string)get_config('local_workshops', 'confirmedemailbody'));
+    if ($body === '') {
+        $body = get_string('confirmedemailbody_default', 'local_workshops');
+    }
+    $subject = strtr($subject, $replace);
+    $text    = strtr(str_replace("\r\n", "\n", $body), $replace);
+
+    $html = nl2br(s($text));
+    $html = preg_replace('~(https?://[^\s<]+)~', '<a href="$1">$1</a>', $html);
+
+    try {
+        $from = core_user::get_support_user();
+        $ok = email_to_user($user, $from, $subject, $text, $html);
+    } catch (Throwable $e) {
+        debugging('local_workshops confirmed email failed: ' . $e->getMessage(), DEBUG_DEVELOPER);
+        $ok = false;
+    }
+    if (!$ok) {
+        return ['code' => 'failed', 'message' => "$name: confirmation email could not be sent."];
+    }
+    return ['code' => 'sent', 'message' => "$name: joining details emailed."];
+}

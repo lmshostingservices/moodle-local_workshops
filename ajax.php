@@ -110,6 +110,14 @@ try {
                 $message .= ' ' . $sync['message'];
             }
 
+            // Newly Confirmed (not a revert from Attended): email the joining details.
+            if ($rec->bookingstatus === 'Confirmed' && !in_array($previousstatus, ['Confirmed', 'Attended'], true)) {
+                $mail = local_workshops_send_confirmed_email($workshop, $rec);
+                if ($mail['message'] !== '') {
+                    $message .= ' ' . $mail['message'];
+                }
+            }
+
             // Newly Attended: email the course link for the survey/assessment.
             if ($rec->bookingstatus === 'Attended' && $previousstatus !== 'Attended') {
                 $mail = local_workshops_send_attended_email($workshop, $rec);
@@ -454,6 +462,8 @@ try {
             $added  = 0;
             $skipped = 0;
             $emailed = 0;
+            $confirmedemailed = 0;
+            $nolink = false;
 
             foreach ($members as $u) {
                 // Skip if already a participant (by userid or by email)
@@ -492,6 +502,13 @@ try {
                     if ($mail['code'] === 'sent') {
                         $emailed++;
                     }
+                } else if ($bookingstatus === 'Confirmed') {
+                    $mail = local_workshops_send_confirmed_email($workshop, $prec);
+                    if ($mail['code'] === 'sent') {
+                        $confirmedemailed++;
+                    } else if ($mail['code'] === 'nolink') {
+                        $nolink = true;
+                    }
                 }
             }
 
@@ -501,6 +518,13 @@ try {
             }
             if ($emailed > 0) {
                 $msg .= ', course link emailed to ' . $emailed;
+            }
+            if ($confirmedemailed > 0) {
+                $msg .= ', joining details emailed to ' . $confirmedemailed;
+            }
+            if ($nolink) {
+                $msg .= '. Confirmation emails not sent - the workshop has no meeting link yet; '
+                    . "add it, then use 'Email joining details'";
             }
             echo json_encode(['success' => true, 'added' => $added, 'skipped' => $skipped, 'message' => $msg . '.']);
             break;

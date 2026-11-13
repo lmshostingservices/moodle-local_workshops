@@ -146,7 +146,7 @@ if ($tab === 'info') {
     }
 
     if ($showWebinar) {
-        $fields['Teams Link'] = $workshop->teamslink
+        $fields[get_string('teamslink', 'local_workshops')] = $workshop->teamslink
             ? ('<a href="' . s($workshop->teamslink) . '" target="_blank">Join Meeting</a>')
             : '—';
         $fields['Platform']   = !empty($workshop->webinarplatform)  ? s($workshop->webinarplatform)  : '—';
@@ -213,6 +213,13 @@ if ($tab === 'participants') {
                . get_string('syncparticipants', 'local_workshops') . '</button></form>';
         }
         if (!empty($participants)) {
+            echo '<form method="post" action="' . (new moodle_url('/local/workshops/sendconfirmation.php'))->out() . '" style="display:inline"'
+               . ' onsubmit="return confirm(' . s(json_encode(get_string('sendjoiningdetails_confirm', 'local_workshops'))) . ');">'
+               . '<input type="hidden" name="workshopid" value="' . $id . '">'
+               . '<input type="hidden" name="sesskey" value="' . sesskey() . '">'
+               . '<button type="submit" class="btn btn-outline-primary btn-sm" '
+               . 'title="' . s(get_string('sendjoiningdetails_help', 'local_workshops')) . '">'
+               . get_string('sendjoiningdetails', 'local_workshops') . '</button></form>';
             echo '<a href="' . (new moodle_url('/local/workshops/ajax.php', ['action' => 'export_participants', 'workshopid' => $id, 'sesskey' => sesskey()]))->out() . '" class="btn btn-outline-secondary btn-sm">Export CSV</a>';
         }
         echo '</div>';

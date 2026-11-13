@@ -136,7 +136,10 @@ class local_workshops_edit_form extends moodleform {
         // Webinar Connection Details section — hidden for Face-to-Face
         $mform->addElement('header', 'webinarinfo', 'Webinar Connection Details');
         $mform->addElement('text', 'teamslink', get_string('teamslink', 'local_workshops'), ['size' => 80]);
-        $mform->setType('teamslink', PARAM_URL);
+        // Not PARAM_URL: it silently blanks anything it rejects (e.g. a stray space copied
+        // from Teams). PARAM_TEXT keeps the value so validation() can normalise it and show
+        // an error instead of saving an empty link.
+        $mform->setType('teamslink', PARAM_TEXT);
         $mform->addElement('text', 'webinarplatform', get_string('webinarplatform', 'local_workshops'), ['size' => 60]);
         $mform->setType('webinarplatform', PARAM_TEXT);
         $mform->addElement('text', 'webinarmeetingid', get_string('webinarmeetingid', 'local_workshops'), ['size' => 40]);
@@ -202,6 +205,9 @@ class local_workshops_edit_form extends moodleform {
         if (empty($data['workshopname'])) {
             $errors['workshopname'] = get_string('required');
         }
+        if (local_workshops_normalise_meeting_url((string)($data['teamslink'] ?? '')) === null) {
+            $errors['teamslink'] = get_string('invalidmeetingurl', 'local_workshops');
+        }
         return $errors;
     }
 }
@@ -235,7 +241,7 @@ if ($mform->is_cancelled()) {
     $record->venue              = $data->venue;
     $record->room               = $data->room;
     $record->address            = $data->address;
-    $record->teamslink          = $data->teamslink;
+    $record->teamslink          = (string)local_workshops_normalise_meeting_url((string)$data->teamslink);
     $record->webinarplatform    = $data->webinarplatform;
     $record->webinarmeetingid   = $data->webinarmeetingid;
     $record->webinarpasscode    = $data->webinarpasscode;

@@ -3,6 +3,21 @@
 All notable changes to local_workshops (Workshop Scheduler) are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [v1.0.40] - 2026-11-13
+
+### Fixed
+- **Webinar/Meeting URL not saving.** The field used Moodle's PARAM_URL cleaner, which silently blanks any value it rejects, so a Teams link pasted with a trailing space, non-breaking or zero-width space was saved as empty with no error. The field now strips those characters, accepts any http(s) link (including long Teams "meetup-join" links), and shows an error on the form if the value isn't a web address. Existing workshops whose link was lost need it re-entered once.
+- Info tab label now reads "Webinar/Meeting URL" (was "Teams Link") to match the form.
+
+### Added
+- **Booking confirmation email.** When a booking changes to **Confirmed** (Add/Edit participant, or Enrol from Group with status Confirmed), the participant is emailed the workshop date/time and joining details: meeting link, platform, meeting ID and passcode for Webinar/Hybrid; venue, room and address for Face-to-Face/Hybrid.
+  - Not sent when an Attended booking is reverted to Confirmed, or when the status was already Confirmed.
+  - Webinar/Hybrid workshops without a meeting link: email held back and the on-screen message says so.
+  - Works without a linked course or Moodle account (sent to the booking's email address).
+  - New settings under "Booking confirmation email": on/off (default on), subject and body with placeholders including {workshopwhen}, {joiningdetails}, {meetingurl}, {platform}, {meetingid}, {passcode}. Defaults set on upgrade.
+- **Email joining details** button on the Participants tab: (re)sends the confirmation email to every Confirmed participant, e.g. after the meeting link is added or changed.
+- No database schema change.
+
 ## [v1.0.39] - 2026-11-09
 
 ### Fixed

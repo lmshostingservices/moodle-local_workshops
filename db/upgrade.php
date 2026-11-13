@@ -78,5 +78,19 @@ function xmldb_local_workshops_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026110902, 'local', 'workshops');
     }
 
+    if ($oldversion < 2026111300) {
+        // v1.0.40: Confirmed email defaults (on), so it works before the settings page is saved.
+        if (get_config('local_workshops', 'confirmedemail') === false) {
+            set_config('confirmedemail', 1, 'local_workshops');
+        }
+        if (get_config('local_workshops', 'confirmedemailsubject') === false) {
+            set_config('confirmedemailsubject', get_string('confirmedemailsubject_default', 'local_workshops'), 'local_workshops');
+        }
+        if (get_config('local_workshops', 'confirmedemailbody') === false) {
+            set_config('confirmedemailbody', get_string('confirmedemailbody_default', 'local_workshops'), 'local_workshops');
+        }
+        upgrade_plugin_savepoint(true, 2026111300, 'local', 'workshops');
+    }
+
     return true;
 }

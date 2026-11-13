@@ -274,3 +274,29 @@ If this is your first time logging in, your login details are emailed to you sep
 Kind regards,
 {sitename}';
 $string['sendattendedemail'] = 'Email newly attended participants the course link';
+
+// v1.0.40: Confirmed email + meeting URL validation.
+$string['invalidmeetingurl'] = 'Enter a full web address starting with https:// (for example the Teams "Join the meeting" link).';
+$string['confirmedemail_heading'] = 'Booking confirmation email';
+$string['confirmedemail_heading_desc'] = 'When a booking changes to Confirmed (Add/Edit participant or Enrol from Group), the participant is emailed the workshop date/time and joining details (meeting link, platform, meeting ID and passcode; or venue for Face-to-Face). Not sent when an Attended booking is reverted to Confirmed. For Webinar and Hybrid workshops it is only sent once the workshop has a meeting link. Use "Email joining details" on the Participants tab to (re)send to everyone Confirmed, e.g. after the link changes.';
+$string['confirmedemail'] = 'Email participants when Confirmed';
+$string['confirmedemail_desc'] = 'Send the email below when a booking is changed to Confirmed.';
+$string['confirmedemailsubject'] = 'Email subject';
+$string['confirmedemailbody'] = 'Email body';
+$string['confirmedemail_placeholders'] = 'Placeholders: {firstname}, {lastname}, {fullname}, {username}, {workshopname}, {workshopdate}, {workshopwhen} (date, start-end time and time zone), {joiningdetails} (link, platform, meeting ID, passcode and/or venue - blank lines omitted), {meetingurl}, {platform}, {meetingid}, {passcode}, {coursename}, {courseurl}, {loginurl}, {sitename}. Plain text; links become clickable.';
+$string['confirmedemailsubject_default'] = 'Confirmed: {workshopname} - joining details';
+$string['confirmedemailbody_default'] = 'Hi {firstname},
+
+Your place in {workshopname} is confirmed.
+
+When: {workshopwhen}
+
+{joiningdetails}
+
+Please join a few minutes before the start time.
+
+Kind regards,
+{sitename}';
+$string['sendjoiningdetails'] = 'Email joining details';
+$string['sendjoiningdetails_help'] = 'Email the date/time and meeting link (or venue) to every participant whose booking is Confirmed. Use after adding or changing the meeting link.';
+$string['sendjoiningdetails_confirm'] = 'Email the joining details to every Confirmed participant now?';
