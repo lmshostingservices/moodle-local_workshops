@@ -128,5 +128,19 @@ function xmldb_local_workshops_upgrade($oldversion) {
         upgrade_plugin_savepoint(true, 2026111800, 'local', 'workshops');
     }
 
+    if ($oldversion < 2026111801) {
+        // v1.0.42: Booked (welcome) email, on by default.
+        if (get_config('local_workshops', 'bookedemail') === false) {
+            set_config('bookedemail', 1, 'local_workshops');
+        }
+        if (get_config('local_workshops', 'bookedemailsubject') === false) {
+            set_config('bookedemailsubject', get_string('bookedemailsubject_default', 'local_workshops'), 'local_workshops');
+        }
+        if (get_config('local_workshops', 'bookedemailbody') === false) {
+            set_config('bookedemailbody', get_string('bookedemailbody_default', 'local_workshops'), 'local_workshops');
+        }
+        upgrade_plugin_savepoint(true, 2026111801, 'local', 'workshops');
+    }
+
     return true;
 }

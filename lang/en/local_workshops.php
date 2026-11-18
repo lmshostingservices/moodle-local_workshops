@@ -316,3 +316,29 @@ $string['sessionorder'] = 'This session must start after the previous session.';
 $string['endbeforestart'] = 'The end must be after the start.';
 $string['confirmedemailics'] = 'Attach a calendar file';
 $string['confirmedemailics_desc'] = 'Attach an .ics calendar file with one entry per session (date, time, meeting link, meeting ID, passcode and a 15-minute reminder). Participants open it to add the session(s) to Outlook, Google or Apple Calendar. Re-sending with "Email joining details" updates the existing entries in most calendars.';
+
+// v1.0.42: Booked (welcome) email.
+$string['bookedemail_heading'] = 'Booking welcome email';
+$string['bookedemail_heading_desc'] = 'When a booking changes to Booked (Add/Edit participant, CSV import, or Enrol from Group with course enrolment), the participant is emailed the workshop date, course link and their username. Not sent when a Confirmed or Attended booking is moved back to Booked. Needs a linked course and a Moodle account. <strong>Turn off Moodle\'s own welcome message in the linked course</strong> (Participants > Enrolment methods > Manual enrolments > Edit > Send course welcome message: No), otherwise participants receive two welcome emails. New accounts still receive Moodle\'s separate login details email.';
+$string['bookedemail'] = 'Email participants when Booked';
+$string['bookedemail_desc'] = 'Send the welcome email below when a booking is changed to Booked.';
+$string['bookedemailsubject'] = 'Email subject';
+$string['bookedemailbody'] = 'Email body';
+$string['bookedemail_placeholders'] = 'Placeholders: {firstname}, {lastname}, {fullname}, {username}, {email}, {workshopname}, {workshopdate} (date, or each date for multi-session workshops), {workshopwhen} (date, time and time zone), {coursename}, {courseurl}, {loginurl}, {forgotpasswordurl}, {sitename}. Plain text; links become clickable.';
+$string['bookedemailsubject_default'] = 'Welcome to your {coursename} course';
+$string['bookedemailbody_default'] = 'Hi {firstname},
+
+We\'re looking forward to welcoming you to the {coursename} course, scheduled for {workshopdate}.
+
+Your course resources are available through {sitename}. These include your Learner Guide, Textbook and supporting documentation.
+
+Access your course resources here:
+{courseurl}
+
+Your username is: {username}
+
+If this is your first time logging in, your login details are emailed to you separately. If you have forgotten your password, you can reset it here:
+{forgotpasswordurl}
+
+Kind regards,
+{sitename}';

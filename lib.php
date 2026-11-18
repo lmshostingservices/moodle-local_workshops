@@ -1005,15 +1005,7 @@ function local_workshops_send_confirmed_email(stdClass $workshop, stdClass $part
 
     $tz = core_date::get_user_timezone($user);
     $sessions = local_workshops_get_sessions($workshop);
-    if (count($sessions) > 1) {
-        $last = end($sessions);
-        $when = count($sessions) . ' sessions, '
-            . userdate($sessions[0]->startdatetime, get_string('strftimedate', 'langconfig'), $tz) . ' to '
-            . userdate($last->startdatetime, get_string('strftimedate', 'langconfig'), $tz)
-            . ' (times in ' . core_date::get_localised_timezone($tz) . ', see below)';
-    } else {
-        $when = local_workshops_format_when((int)$workshop->startdatetime, (int)$workshop->enddatetime, $tz);
-    }
+    $when = local_workshops_when_summary($workshop, $tz);
 
     // Calendar file (.ics) with one event per session.
     $icspath = '';
@@ -1096,4 +1088,124 @@ function local_workshops_send_confirmed_email(stdClass $workshop, stdClass $part
         return ['code' => 'failed', 'message' => "$name: confirmation email could not be sent."];
     }
     return ['code' => 'sent', 'message' => "$name: joining details emailed."];
+}
+
+/**
+ * When a workshop runs, for emails. One session: "Monday, 16 November 2026,
+ * 10:00 AM - 12:00 PM (Australia/Perth)". Several: "3 sessions, 16 November
+ * 2026 to 18 November 2026 (times in Australia/Perth, see below)".
+ *
+ * @param stdClass $workshop
+ * @param string|float|int $tz
+ * @return string
+ */
+function local_workshops_when_summary(stdClass $workshop, $tz): string {
+    $sessions = local_workshops_get_sessions($workshop);
+    if (count($sessions) > 1 && $sessions[0]->startdatetime) {
+        $last = end($sessions);
+        return count($sessions) . ' sessions, '
+            . userdate($sessions[0]->startdatetime, get_string('strftimedate', 'langconfig'), $tz) . ' to '
+            . userdate($last->startdatetime, get_string('strftimedate', 'langconfig'), $tz)
+            . ' (times in ' . core_date::get_localised_timezone($tz) . ', see below)';
+    }
+    return local_workshops_format_when((int)$workshop->startdatetime, (int)$workshop->enddatetime, $tz);
+}
+
+/**
+ * Workshop date(s) only, for emails: "16 November 2026", or for several
+ * sessions "16 November 2026, 17 November 2026 and 18 November 2026".
+ *
+ * @param stdClass $workshop
+ * @param string|float|int $tz
+ * @return string
+ */
+function local_workshops_date_summary(stdClass $workshop, $tz): string {
+    $dates = [];
+    foreach (local_workshops_get_sessions($workshop) as $sess) {
+        if ($sess->startdatetime) {
+            $dates[] = userdate($sess->startdatetime, get_string('strftimedate', 'langconfig'), $tz);
+        }
+    }
+    $dates = array_values(array_unique($dates));
+    if (count($dates) <= 1) {
+        return $dates[0] ?? '';
+    }
+    $last = array_pop($dates);
+    return implode(', ', $dates) . ' and ' . $last;
+}
+
+/**
+ * Welcome email when a booking becomes Booked: workshop date, course link,
+ * username and password-reset link. Replaces Moodle's manual-enrolment
+ * course welcome message (turn that off in the course to avoid two emails).
+ *
+ * Needs a linked course and a Moodle account (created/linked by
+ * local_workshops_sync_participant(), which must run first).
+ *
+ * @param stdClass $workshop    local_workshops record.
+ * @param stdClass $participant local_workshop_participants record (after sync).
+ * @return array ['code' => sent|disabled|nocourse|nouser|failed, 'message' => string]
+ */
+function local_workshops_send_booked_email(stdClass $workshop, stdClass $participant): array {
+    global $DB, $SITE;
+
+    $name = trim($participant->firstname . ' ' . $participant->lastname);
+
+    if (!get_config('local_workshops', 'bookedemail')) {
+        return ['code' => 'disabled', 'message' => ''];
+    }
+    $course = !empty($workshop->courseid) ? $DB->get_record('course', ['id' => $workshop->courseid]) : null;
+    if (!$course) {
+        return ['code' => 'nocourse', 'message' => "$name: welcome email not sent - the workshop has no linked course."];
+    }
+    $user = !empty($participant->userid)
+        ? $DB->get_record('user', ['id' => $participant->userid, 'deleted' => 0, 'suspended' => 0]) : null;
+    if (!$user) {
+        return ['code' => 'nouser', 'message' => "$name: welcome email not sent - no Moodle account linked."];
+    }
+
+    $tz = core_date::get_user_timezone($user);
+    $replace = [
+        '{firstname}'         => $user->firstname,
+        '{lastname}'          => $user->lastname,
+        '{fullname}'          => trim($user->firstname . ' ' . $user->lastname),
+        '{username}'          => $user->username,
+        '{email}'             => $user->email,
+        '{workshopname}'      => $workshop->workshopname,
+        '{workshopdate}'      => local_workshops_date_summary($workshop, $tz),
+        '{workshopwhen}'      => local_workshops_when_summary($workshop, $tz),
+        '{coursename}'        => format_string($course->fullname, true,
+            ['context' => context_course::instance($course->id), 'escape' => false]),
+        '{courseurl}'         => (new moodle_url('/course/view.php', ['id' => $course->id]))->out(false),
+        '{loginurl}'          => (new moodle_url('/login/index.php'))->out(false),
+        '{forgotpasswordurl}' => (new moodle_url('/login/forgot_password.php'))->out(false),
+        '{sitename}'          => format_string($SITE->fullname, true,
+            ['context' => context_system::instance(), 'escape' => false]),
+    ];
+
+    $subject = trim((string)get_config('local_workshops', 'bookedemailsubject'));
+    if ($subject === '') {
+        $subject = get_string('bookedemailsubject_default', 'local_workshops');
+    }
+    $body = trim((string)get_config('local_workshops', 'bookedemailbody'));
+    if ($body === '') {
+        $body = get_string('bookedemailbody_default', 'local_workshops');
+    }
+    $subject = strtr($subject, $replace);
+    $text    = strtr(str_replace("\r\n", "\n", $body), $replace);
+    $text    = preg_replace("/\n{3,}/", "\n\n", $text);
+
+    $html = nl2br(s($text));
+    $html = preg_replace('~(https?://[^\s<]+)~', '<a href="$1">$1</a>', $html);
+
+    try {
+        $ok = email_to_user($user, core_user::get_support_user(), $subject, $text, $html);
+    } catch (Throwable $e) {
+        debugging('local_workshops booked email failed: ' . $e->getMessage(), DEBUG_DEVELOPER);
+        $ok = false;
+    }
+    if (!$ok) {
+        return ['code' => 'failed', 'message' => "$name: welcome email could not be sent."];
+    }
+    return ['code' => 'sent', 'message' => "$name: welcome email sent."];
 }

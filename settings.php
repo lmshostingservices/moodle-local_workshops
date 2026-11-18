@@ -107,6 +107,38 @@ if ($hassiteconfig) {
     ));
 
     $settings->add(new admin_setting_heading(
+        'local_workshops/bookedemailheading',
+        get_string('bookedemail_heading', 'local_workshops'),
+        get_string('bookedemail_heading_desc', 'local_workshops')
+    ));
+
+    $settings->add(new admin_setting_configcheckbox(
+        'local_workshops/bookedemail',
+        get_string('bookedemail', 'local_workshops'),
+        get_string('bookedemail_desc', 'local_workshops'),
+        1
+    ));
+
+    $settings->add(new admin_setting_configtext(
+        'local_workshops/bookedemailsubject',
+        get_string('bookedemailsubject', 'local_workshops'),
+        get_string('bookedemail_placeholders', 'local_workshops'),
+        get_string('bookedemailsubject_default', 'local_workshops'),
+        PARAM_TEXT,
+        80
+    ));
+
+    $settings->add(new admin_setting_configtextarea(
+        'local_workshops/bookedemailbody',
+        get_string('bookedemailbody', 'local_workshops'),
+        get_string('bookedemail_placeholders', 'local_workshops'),
+        get_string('bookedemailbody_default', 'local_workshops'),
+        PARAM_TEXT,
+        80,
+        18
+    ));
+
+    $settings->add(new admin_setting_heading(
         'local_workshops/confirmedemailheading',
         get_string('confirmedemail_heading', 'local_workshops'),
         get_string('confirmedemail_heading_desc', 'local_workshops')

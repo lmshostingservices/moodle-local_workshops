@@ -3,6 +3,16 @@
 All notable changes to local_workshops (Workshop Scheduler) are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [v1.0.42] - 2026-11-18
+
+### Added
+- **Booking welcome email.** When a booking changes to **Booked** (Add/Edit participant, CSV import, or Enrol from Group with course enrolment), the participant is emailed the workshop date, the linked course URL, their Moodle username and the password-reset link.
+  - Not sent when a Confirmed or Attended booking is moved back to Booked, or if the status was already Booked.
+  - Needs a linked course and a Moodle account (created or linked by the course sync, which runs first). Otherwise the on-screen message says why it wasn't sent.
+  - New settings under "Booking welcome email": on/off (default on), subject and body. Placeholders: {firstname}, {lastname}, {fullname}, {username}, {email}, {workshopname}, {workshopdate}, {workshopwhen}, {coursename}, {courseurl}, {loginurl}, {forgotpasswordurl}, {sitename}. Defaults set on upgrade.
+  - Replaces Moodle's manual-enrolment "course welcome message"; turn that off in the linked course to avoid two welcome emails. Moodle's separate new-account login email is unchanged.
+- No database schema change.
+
 ## [v1.0.41] - 2026-11-18
 
 ### Added

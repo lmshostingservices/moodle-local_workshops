@@ -110,6 +110,14 @@ try {
                 $message .= ' ' . $sync['message'];
             }
 
+            // Newly Booked (new booking, or from Waitlisted/Cancelled/No Show): welcome email.
+            if ($rec->bookingstatus === 'Booked' && !in_array($previousstatus, ['Booked', 'Confirmed', 'Attended'], true)) {
+                $mail = local_workshops_send_booked_email($workshop, $rec);
+                if ($mail['message'] !== '') {
+                    $message .= ' ' . $mail['message'];
+                }
+            }
+
             // Newly Confirmed (not a revert from Attended): email the joining details.
             if ($rec->bookingstatus === 'Confirmed' && !in_array($previousstatus, ['Confirmed', 'Attended'], true)) {
                 $mail = local_workshops_send_confirmed_email($workshop, $rec);
@@ -463,6 +471,7 @@ try {
             $skipped = 0;
             $emailed = 0;
             $confirmedemailed = 0;
+            $welcomeemailed = 0;
             $nolink = false;
 
             foreach ($members as $u) {
@@ -502,6 +511,11 @@ try {
                     if ($mail['code'] === 'sent') {
                         $emailed++;
                     }
+                } else if ($bookingstatus === 'Booked' && $enrolcourse) {
+                    $mail = local_workshops_send_booked_email($workshop, $prec);
+                    if ($mail['code'] === 'sent') {
+                        $welcomeemailed++;
+                    }
                 } else if ($bookingstatus === 'Confirmed') {
                     $mail = local_workshops_send_confirmed_email($workshop, $prec);
                     if ($mail['code'] === 'sent') {
@@ -518,6 +532,9 @@ try {
             }
             if ($emailed > 0) {
                 $msg .= ', course link emailed to ' . $emailed;
+            }
+            if ($welcomeemailed > 0) {
+                $msg .= ', welcome email sent to ' . $welcomeemailed;
             }
             if ($confirmedemailed > 0) {
                 $msg .= ', joining details emailed to ' . $confirmedemailed;

@@ -60,6 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && confirm_sesskey()) {
         $imported = 0;
         $skipped  = 0;
         $syncsummary = ['messages' => []];
+        $welcomesent = 0;
         foreach ($postedRows as $row) {
             $rowstatus = isset($row['status']) ? $row['status'] : 'invalid';
             if ($rowstatus === 'ok') {
@@ -95,6 +96,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && confirm_sesskey()) {
                 if (in_array($r['code'], ['nouser', 'nopermission', 'error'], true)) {
                     $syncsummary['messages'][] = $r['message'];
                 }
+
+                // Welcome email (course link, username, workshop date).
+                $mail = local_workshops_send_booked_email($workshop, $rec);
+                if ($mail['code'] === 'sent') {
+                    $welcomesent++;
+                }
             } else {
                 $skipped++;
             }
@@ -102,7 +109,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && confirm_sesskey()) {
         redirect(
             new moodle_url('/local/workshops/view.php', ['id' => $workshopid, 'tab' => 'participants']),
             "Import complete: $imported imported, $skipped skipped. "
-                . ($imported ? local_workshops_sync_summary($syncsummary) : ''),
+                . ($imported ? local_workshops_sync_summary($syncsummary) : '')
+                . ($welcomesent ? ' Welcome email sent to ' . $welcomesent . '.' : ''),
             null, \core\output\notification::NOTIFY_SUCCESS
         );
     } else {
