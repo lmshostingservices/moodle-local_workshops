@@ -152,6 +152,32 @@ if ($tab === 'info') {
         $fields['Platform']   = !empty($workshop->webinarplatform)  ? s($workshop->webinarplatform)  : '—';
         $fields['Meeting ID'] = !empty($workshop->webinarmeetingid) ? s($workshop->webinarmeetingid) : '—';
         $fields['Passcode']   = !empty($workshop->webinarpasscode)  ? s($workshop->webinarpasscode)  : '—';
+
+        // Sessions 2 and 3 (multi-day webinars).
+        $allsessions = local_workshops_get_sessions($workshop);
+        if (count($allsessions) > 1) {
+            $tz = core_date::get_user_timezone();
+            foreach ($allsessions as $i => $sess) {
+                $html = s(local_workshops_format_when($sess->startdatetime, $sess->enddatetime, $tz, false)) ?: '—';
+                if ($i > 0) {
+                    $conn = [];
+                    if ($sess->meetingurl !== '') {
+                        $conn[] = '<a href="' . s($sess->meetingurl) . '" target="_blank">Join Meeting</a>'
+                            . ($sess->meetingurl === (string)$workshop->teamslink ? ' (same as Session 1)' : '');
+                    }
+                    foreach (['Platform' => $sess->platform, 'Meeting ID' => $sess->meetingid, 'Passcode' => $sess->passcode]
+                            as $label => $val) {
+                        if ($val !== '') {
+                            $conn[] = $label . ': ' . s($val);
+                        }
+                    }
+                    if ($conn) {
+                        $html .= '<br>' . implode('<br>', $conn);
+                    }
+                }
+                $fields['Session ' . ($i + 1) . ' of ' . count($allsessions)] = $html;
+            }
+        }
     }
 
     $fields['Capacity']           = $workshop->capacity ? (int)$workshop->capacity . ' participants' : '—';

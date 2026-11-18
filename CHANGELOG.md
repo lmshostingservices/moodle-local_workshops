@@ -3,6 +3,21 @@
 All notable changes to local_workshops (Workshop Scheduler) are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [v1.0.41] - 2026-11-18
+
+### Added
+- **Multi-session webinars.** New "Additional Sessions (multi-day webinars)" section on the workshop form (Webinar/Hybrid only) for Session 2 and Session 3, each with its own start/end date and time, meeting URL, platform, meeting ID and passcode. Session 1 is the workshop's existing Start/End and Webinar Connection Details.
+  - Leave a session's meeting URL blank to reuse Session 1's link, meeting ID and passcode (e.g. a recurring Teams meeting).
+  - Validation: a session needs a start date; end after start; sessions in date order; Session 1 needs a start date when extra sessions are added.
+  - Info tab lists each session with its date/time and joining details.
+  - Confirmed email: {workshopwhen} shows the date range and session count; {joiningdetails} lists every session with its date, time and joining details.
+- **Calendar file on the Confirmed email.** An .ics file is attached with one calendar entry per session (title, date/time, Teams link as location and in the notes, meeting ID, passcode, 15-minute reminder). Times are stored in UTC so they show in each participant's own time zone. Each entry has a fixed ID, so re-sending with "Email joining details" after a change updates the existing entry in most calendars. New setting "Attach a calendar file" (on by default) and new placeholder {calendarnote}.
+  - On upgrade, the Confirmed email body is updated to include {calendarnote} only if it still matches the v1.0.40 default.
+- Removing a workshop also removes its extra sessions.
+
+### Database
+- New table `local_workshop_sessions` (created on upgrade).
+
 ## [v1.0.40] - 2026-11-13
 
 ### Fixed

@@ -283,7 +283,7 @@ $string['confirmedemail'] = 'Email participants when Confirmed';
 $string['confirmedemail_desc'] = 'Send the email below when a booking is changed to Confirmed.';
 $string['confirmedemailsubject'] = 'Email subject';
 $string['confirmedemailbody'] = 'Email body';
-$string['confirmedemail_placeholders'] = 'Placeholders: {firstname}, {lastname}, {fullname}, {username}, {workshopname}, {workshopdate}, {workshopwhen} (date, start-end time and time zone), {joiningdetails} (link, platform, meeting ID, passcode and/or venue - blank lines omitted), {meetingurl}, {platform}, {meetingid}, {passcode}, {coursename}, {courseurl}, {loginurl}, {sitename}. Plain text; links become clickable.';
+$string['confirmedemail_placeholders'] = 'Placeholders: {firstname}, {lastname}, {fullname}, {username}, {workshopname}, {workshopdate}, {workshopwhen} (date, start-end time and time zone; for multi-session workshops the date range), {joiningdetails} (link, platform, meeting ID, passcode and/or venue; for multi-session workshops a block per session with its date and time), {calendarnote} (a line about the attached calendar file, blank if none), {meetingurl}, {platform}, {meetingid}, {passcode}, {coursename}, {courseurl}, {loginurl}, {sitename}. Plain text; links become clickable.';
 $string['confirmedemailsubject_default'] = 'Confirmed: {workshopname} - joining details';
 $string['confirmedemailbody_default'] = 'Hi {firstname},
 
@@ -293,6 +293,8 @@ When: {workshopwhen}
 
 {joiningdetails}
 
+{calendarnote}
+
 Please join a few minutes before the start time.
 
 Kind regards,
@@ -300,3 +302,17 @@ Kind regards,
 $string['sendjoiningdetails'] = 'Email joining details';
 $string['sendjoiningdetails_help'] = 'Email the date/time and meeting link (or venue) to every participant whose booking is Confirmed. Use after adding or changing the meeting link.';
 $string['sendjoiningdetails_confirm'] = 'Email the joining details to every Confirmed participant now?';
+
+// v1.0.41: Multi-session webinars + calendar attachment.
+$string['webinarhelp'] = 'Session 1 uses the Start and End Date & Time above. Enter the meeting URL, platform (e.g. Zoom, Teams, Webex), meeting ID and passcode.';
+$string['additionalsessions'] = 'Additional Sessions (multi-day webinars)';
+$string['additionalsessions_help'] = 'For workshops run as more than one webinar (e.g. three mornings), add Session 2 and Session 3 here. Leave the meeting URL blank to use the Session 1 link, meeting ID and passcode (e.g. a recurring Teams meeting). Untick a session\'s start date to remove it.';
+$string['sessionn'] = 'Session {$a}';
+$string['sessionstart'] = 'Start Date & Time';
+$string['sessionend'] = 'End Date & Time';
+$string['sessionneedsstart'] = 'Set a start date and time for this session, or clear its other details.';
+$string['session1needsstart'] = 'Set the Start Date & Time (Session 1) when adding further sessions.';
+$string['sessionorder'] = 'This session must start after the previous session.';
+$string['endbeforestart'] = 'The end must be after the start.';
+$string['confirmedemailics'] = 'Attach a calendar file';
+$string['confirmedemailics_desc'] = 'Attach an .ics calendar file with one entry per session (date, time, meeting link, meeting ID, passcode and a 15-minute reminder). Participants open it to add the session(s) to Outlook, Google or Apple Calendar. Re-sending with "Email joining details" updates the existing entries in most calendars.';

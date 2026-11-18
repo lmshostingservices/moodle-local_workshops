@@ -116,5 +116,26 @@
         <KEY NAME="fk_assignedto" TYPE="foreign" FIELDS="assignedto" REFTABLE="user" REFFIELDS="id"/>
       </KEYS>
     </TABLE>
+    <TABLE NAME="local_workshop_sessions" COMMENT="Extra sessions (2 and 3) for multi-day workshops; session 1 is on local_workshops">
+      <FIELDS>
+        <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
+        <FIELD NAME="workshopid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="sessionno" TYPE="int" LENGTH="2" NOTNULL="true" SEQUENCE="false" COMMENT="2 or 3"/>
+        <FIELD NAME="startdatetime" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
+        <FIELD NAME="enddatetime" TYPE="int" LENGTH="10" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="meetingurl" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Blank = same as session 1"/>
+        <FIELD NAME="platform" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="meetingid" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="passcode" TYPE="char" LENGTH="100" NOTNULL="false" SEQUENCE="false"/>
+        <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
+      </FIELDS>
+      <KEYS>
+        <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
+        <KEY NAME="fk_workshopid" TYPE="foreign" FIELDS="workshopid" REFTABLE="local_workshops" REFFIELDS="id"/>
+      </KEYS>
+      <INDEXES>
+        <INDEX NAME="uix_workshop_session" UNIQUE="true" FIELDS="workshopid, sessionno"/>
+      </INDEXES>
+    </TABLE>
   </TABLES>
 </XMLDB>

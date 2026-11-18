@@ -119,6 +119,13 @@ if ($hassiteconfig) {
         1
     ));
 
+    $settings->add(new admin_setting_configcheckbox(
+        'local_workshops/confirmedemailics',
+        get_string('confirmedemailics', 'local_workshops'),
+        get_string('confirmedemailics_desc', 'local_workshops'),
+        1
+    ));
+
     $settings->add(new admin_setting_configtext(
         'local_workshops/confirmedemailsubject',
         get_string('confirmedemailsubject', 'local_workshops'),

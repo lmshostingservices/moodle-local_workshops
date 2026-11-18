@@ -31,6 +31,7 @@ defined('MOODLE_INTERNAL') || die();
  * @return bool
  */
 function xmldb_local_workshops_upgrade($oldversion) {
+    global $DB;
     if ($oldversion < 2026072400) {
         upgrade_plugin_savepoint(true, 2026072400, 'local', 'workshops');
     }
@@ -90,6 +91,41 @@ function xmldb_local_workshops_upgrade($oldversion) {
             set_config('confirmedemailbody', get_string('confirmedemailbody_default', 'local_workshops'), 'local_workshops');
         }
         upgrade_plugin_savepoint(true, 2026111300, 'local', 'workshops');
+    }
+
+    if ($oldversion < 2026111800) {
+        // v1.0.41: extra sessions (2 and 3) for multi-day webinars.
+        $dbman = $DB->get_manager();
+        $table = new xmldb_table('local_workshop_sessions');
+        $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
+        $table->add_field('workshopid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('sessionno', XMLDB_TYPE_INTEGER, '2', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('startdatetime', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
+        $table->add_field('enddatetime', XMLDB_TYPE_INTEGER, '10', null, null, null, null);
+        $table->add_field('meetingurl', XMLDB_TYPE_TEXT, null, null, null, null, null);
+        $table->add_field('platform', XMLDB_TYPE_CHAR, '100', null, null, null, null);
+        $table->add_field('meetingid', XMLDB_TYPE_CHAR, '100', null, null, null, null);
+        $table->add_field('passcode', XMLDB_TYPE_CHAR, '100', null, null, null, null);
+        $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0');
+        $table->add_key('primary', XMLDB_KEY_PRIMARY, ['id']);
+        $table->add_key('fk_workshopid', XMLDB_KEY_FOREIGN, ['workshopid'], 'local_workshops', ['id']);
+        $table->add_index('uix_workshop_session', XMLDB_INDEX_UNIQUE, ['workshopid', 'sessionno']);
+        if (!$dbman->table_exists($table)) {
+            $dbman->create_table($table);
+        }
+
+        // Calendar attachment on by default.
+        if (get_config('local_workshops', 'confirmedemailics') === false) {
+            set_config('confirmedemailics', 1, 'local_workshops');
+        }
+        // New default body adds {calendarnote}. Replace only if the admin hasn't edited it.
+        $olddefault = "Hi {firstname},\n\nYour place in {workshopname} is confirmed.\n\nWhen: {workshopwhen}\n\n"
+            . "{joiningdetails}\n\nPlease join a few minutes before the start time.\n\nKind regards,\n{sitename}";
+        $current = get_config('local_workshops', 'confirmedemailbody');
+        if ($current === false || str_replace("\r\n", "\n", trim($current)) === $olddefault) {
+            set_config('confirmedemailbody', get_string('confirmedemailbody_default', 'local_workshops'), 'local_workshops');
+        }
+        upgrade_plugin_savepoint(true, 2026111800, 'local', 'workshops');
     }
 
     return true;

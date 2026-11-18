@@ -66,6 +66,7 @@ if ($delete && $id && confirm_sesskey()) {
         }
     }
     $DB->delete_records('local_workshop_documents', ['workshopid' => $id]);
+    $DB->delete_records('local_workshop_sessions', ['workshopid' => $id]);
     $DB->delete_records('local_workshops', ['id' => $id]);
     redirect(new moodle_url('/local/workshops/manage.php'),
         get_string('workshopdeleted', 'local_workshops'), null, \core\output\notification::NOTIFY_SUCCESS);
@@ -146,7 +147,7 @@ class local_workshops_edit_form extends moodleform {
         $mform->setType('webinarmeetingid', PARAM_TEXT);
         $mform->addElement('text', 'webinarpasscode', get_string('webinarpasscode', 'local_workshops'), ['size' => 40]);
         $mform->setType('webinarpasscode', PARAM_TEXT);
-        $mform->addElement('static', 'webinarhelp', '', 'Enter the meeting URL, platform (e.g. Zoom, Teams, Webex), meeting ID and passcode.');
+        $mform->addElement('static', 'webinarhelp', '', get_string('webinarhelp', 'local_workshops'));
         // Hide the entire Webinar section when Face-to-Face is selected
         $mform->hideIf('webinarinfo',      'deliverytype', 'eq', 'Face-to-Face');
         $mform->hideIf('teamslink',        'deliverytype', 'eq', 'Face-to-Face');
@@ -154,6 +155,36 @@ class local_workshops_edit_form extends moodleform {
         $mform->hideIf('webinarmeetingid', 'deliverytype', 'eq', 'Face-to-Face');
         $mform->hideIf('webinarpasscode',  'deliverytype', 'eq', 'Face-to-Face');
         $mform->hideIf('webinarhelp',      'deliverytype', 'eq', 'Face-to-Face');
+
+        // Additional sessions (2 and 3) for multi-day webinars — hidden for Face-to-Face.
+        $mform->addElement('header', 'sessionsinfo', get_string('additionalsessions', 'local_workshops'));
+        $mform->addElement('static', 'sessionshelp', '', get_string('additionalsessions_help', 'local_workshops'));
+        $mform->hideIf('sessionsinfo', 'deliverytype', 'eq', 'Face-to-Face');
+        for ($n = 2; $n <= LOCAL_WORKSHOPS_MAX_SESSIONS; $n++) {
+            $a = $n;
+            $mform->addElement('static', "s{$n}heading", '', html_writer::tag('h5', get_string('sessionn', 'local_workshops', $a),
+                ['class' => 'mt-3 mb-0']));
+            $mform->addElement('date_time_selector', "s{$n}start", get_string('sessionstart', 'local_workshops'), ['optional' => true]);
+            $mform->addElement('date_time_selector', "s{$n}end", get_string('sessionend', 'local_workshops'), ['optional' => true]);
+            $mform->addElement('text', "s{$n}url", get_string('teamslink', 'local_workshops'), ['size' => 80]);
+            $mform->setType("s{$n}url", PARAM_TEXT);
+            $mform->addElement('text', "s{$n}platform", get_string('webinarplatform', 'local_workshops'), ['size' => 60]);
+            $mform->setType("s{$n}platform", PARAM_TEXT);
+            $mform->addElement('text', "s{$n}meetingid", get_string('webinarmeetingid', 'local_workshops'), ['size' => 40]);
+            $mform->setType("s{$n}meetingid", PARAM_TEXT);
+            $mform->addElement('text', "s{$n}passcode", get_string('webinarpasscode', 'local_workshops'), ['size' => 40]);
+            $mform->setType("s{$n}passcode", PARAM_TEXT);
+            foreach (['heading', 'start', 'end', 'url', 'platform', 'meetingid', 'passcode'] as $f) {
+                $mform->hideIf("s{$n}{$f}", 'deliverytype', 'eq', 'Face-to-Face');
+            }
+        }
+        if (!empty($this->_customdata['workshop']) && $this->_customdata['workshop']->deliverytype !== 'Face-to-Face') {
+            // Open the section when the workshop already has extra sessions.
+            global $DB;
+            if ($DB->record_exists('local_workshop_sessions', ['workshopid' => $this->_customdata['workshop']->id])) {
+                $mform->setExpanded('sessionsinfo', true);
+            }
+        }
 
         // Location & Logistics section — hidden for Webinar
         $mform->addElement('header', 'locationinfo', 'Location & Logistics');
@@ -208,6 +239,38 @@ class local_workshops_edit_form extends moodleform {
         if (local_workshops_normalise_meeting_url((string)($data['teamslink'] ?? '')) === null) {
             $errors['teamslink'] = get_string('invalidmeetingurl', 'local_workshops');
         }
+        if (!empty($data['startdatetime']) && !empty($data['enddatetime']) && $data['enddatetime'] < $data['startdatetime']) {
+            $errors['enddatetime'] = get_string('endbeforestart', 'local_workshops');
+        }
+        if (($data['deliverytype'] ?? '') !== 'Face-to-Face') {
+            $anyextra = false;
+            $prevstart = (int)($data['startdatetime'] ?? 0);
+            for ($n = 2; $n <= LOCAL_WORKSHOPS_MAX_SESSIONS; $n++) {
+                $start = (int)($data["s{$n}start"] ?? 0);
+                $end   = (int)($data["s{$n}end"] ?? 0);
+                $other = trim(($data["s{$n}url"] ?? '') . ($data["s{$n}platform"] ?? '')
+                    . ($data["s{$n}meetingid"] ?? '') . ($data["s{$n}passcode"] ?? ''));
+                if (!$start && ($end || $other !== '')) {
+                    $errors["s{$n}start"] = get_string('sessionneedsstart', 'local_workshops');
+                }
+                if ($start && $end && $end < $start) {
+                    $errors["s{$n}end"] = get_string('endbeforestart', 'local_workshops');
+                }
+                if ($start && $prevstart && $start <= $prevstart) {
+                    $errors["s{$n}start"] = get_string('sessionorder', 'local_workshops');
+                }
+                if (local_workshops_normalise_meeting_url((string)($data["s{$n}url"] ?? '')) === null) {
+                    $errors["s{$n}url"] = get_string('invalidmeetingurl', 'local_workshops');
+                }
+                if ($start) {
+                    $anyextra = true;
+                    $prevstart = $start;
+                }
+            }
+            if ($anyextra && empty($data['startdatetime'])) {
+                $errors['startdatetime'] = get_string('session1needsstart', 'local_workshops');
+            }
+        }
         return $errors;
     }
 }
@@ -221,6 +284,15 @@ if ($workshop) {
     $formdata['trainerids'] = $DB->get_fieldset_select(
         'local_workshop_trainers', 'userid', 'workshopid = :wid', ['wid' => $workshop->id]
     );
+    foreach ($DB->get_records('local_workshop_sessions', ['workshopid' => $workshop->id]) as $sess) {
+        $n = (int)$sess->sessionno;
+        $formdata["s{$n}start"]     = (int)$sess->startdatetime;
+        $formdata["s{$n}end"]       = (int)$sess->enddatetime;
+        $formdata["s{$n}url"]       = $sess->meetingurl;
+        $formdata["s{$n}platform"]  = $sess->platform;
+        $formdata["s{$n}meetingid"] = $sess->meetingid;
+        $formdata["s{$n}passcode"]  = $sess->passcode;
+    }
     $mform->set_data($formdata);
 }
 
@@ -262,6 +334,35 @@ if ($mform->is_cancelled()) {
     } else {
         $record->id = $data->id;
         $DB->update_record('local_workshops', $record);
+    }
+
+    // Save sessions 2 and 3 (kept, but ignored, if the workshop is switched to Face-to-Face).
+    for ($n = 2; $n <= LOCAL_WORKSHOPS_MAX_SESSIONS; $n++) {
+        $existing = $DB->get_record('local_workshop_sessions', ['workshopid' => $record->id, 'sessionno' => $n]);
+        $start = !empty($data->{"s{$n}start"}) ? (int)$data->{"s{$n}start"} : 0;
+        if (!$start) {
+            if ($existing && $data->deliverytype !== 'Face-to-Face') {
+                $DB->delete_records('local_workshop_sessions', ['id' => $existing->id]);
+            }
+            continue;
+        }
+        $srec = (object)[
+            'workshopid'    => $record->id,
+            'sessionno'     => $n,
+            'startdatetime' => $start,
+            'enddatetime'   => !empty($data->{"s{$n}end"}) ? (int)$data->{"s{$n}end"} : null,
+            'meetingurl'    => (string)local_workshops_normalise_meeting_url((string)$data->{"s{$n}url"}),
+            'platform'      => trim((string)$data->{"s{$n}platform"}),
+            'meetingid'     => trim((string)$data->{"s{$n}meetingid"}),
+            'passcode'      => trim((string)$data->{"s{$n}passcode"}),
+            'timemodified'  => $now,
+        ];
+        if ($existing) {
+            $srec->id = $existing->id;
+            $DB->update_record('local_workshop_sessions', $srec);
+        } else {
+            $DB->insert_record('local_workshop_sessions', $srec);
+        }
     }
 
     // Save trainers to junction table.
@@ -329,6 +430,7 @@ echo '<script>
     }
 
     var webinarSection  = getSectionFieldset(\'id_webinarinfo\',  \'Webinar\');
+    var sessionsSection = document.getElementById(\'id_sessionsinfo\');
     var locationSection = getSectionFieldset(\'id_locationinfo\', \'Location\');
 
     // ---- Individual field wrappers ----
@@ -362,7 +464,7 @@ echo '<script>
         var isWebinar = (val === \'Webinar\');
 
         // Webinar section: visible for Webinar + Hybrid, hidden for Face-to-Face.
-        setVisibility([webinarSection],  webinarFields,  !isFtF);
+        setVisibility([webinarSection, sessionsSection],  webinarFields,  !isFtF);
 
         // Location section: visible for Face-to-Face + Hybrid, hidden for Webinar.
         setVisibility([locationSection], locationFields, !isWebinar);

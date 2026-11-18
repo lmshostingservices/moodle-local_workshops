@@ -712,47 +712,263 @@ function local_workshops_email_recipient(stdClass $participant): ?stdClass {
     return $user;
 }
 
+/** Maximum number of sessions per workshop (session 1 + extras). */
+define('LOCAL_WORKSHOPS_MAX_SESSIONS', 3);
+
 /**
- * Plain-text joining details for a workshop: meeting link/platform/ID/passcode
- * for Webinar and Hybrid, venue/room/address for Face-to-Face and Hybrid.
- * Empty fields are left out.
+ * All sessions for a workshop, in order. Session 1 is the workshop's own
+ * start/end and connection details; sessions 2-3 come from
+ * local_workshop_sessions (Webinar/Hybrid only). A blank link, platform,
+ * meeting ID or passcode on session 2/3 falls back to session 1's.
  *
  * @param stdClass $workshop
+ * @return stdClass[] Each: sessionno, startdatetime, enddatetime, meetingurl, platform, meetingid, passcode.
+ */
+function local_workshops_get_sessions(stdClass $workshop): array {
+    global $DB;
+    $first = (object)[
+        'sessionno'     => 1,
+        'startdatetime' => (int)$workshop->startdatetime,
+        'enddatetime'   => (int)$workshop->enddatetime,
+        'meetingurl'    => (string)$workshop->teamslink,
+        'platform'      => (string)$workshop->webinarplatform,
+        'meetingid'     => (string)$workshop->webinarmeetingid,
+        'passcode'      => (string)$workshop->webinarpasscode,
+    ];
+    $sessions = [$first];
+    if (empty($workshop->id) || $workshop->deliverytype === 'Face-to-Face') {
+        return $sessions;
+    }
+    $extras = $DB->get_records('local_workshop_sessions', ['workshopid' => $workshop->id], 'sessionno ASC');
+    foreach ($extras as $x) {
+        $sameconnection = trim((string)$x->meetingurl) === '';
+        $sessions[] = (object)[
+            'sessionno'     => (int)$x->sessionno,
+            'startdatetime' => (int)$x->startdatetime,
+            'enddatetime'   => (int)$x->enddatetime,
+            'meetingurl'    => $sameconnection ? $first->meetingurl : (string)$x->meetingurl,
+            // With a different link, show only that session's own ID/passcode.
+            'platform'      => trim((string)$x->platform) !== '' ? (string)$x->platform : $first->platform,
+            'meetingid'     => trim((string)$x->meetingid) !== '' ? (string)$x->meetingid
+                : ($sameconnection ? $first->meetingid : ''),
+            'passcode'      => trim((string)$x->passcode) !== '' ? (string)$x->passcode
+                : ($sameconnection ? $first->passcode : ''),
+        ];
+    }
+    return $sessions;
+}
+
+/**
+ * "Monday, 16 November 2026, 10:00 AM - 12:00 PM" (end shows the date too if
+ * it is on a different day). Optionally followed by the time zone.
+ *
+ * @param int $start
+ * @param int $end
+ * @param string|float|int $tz
+ * @param bool $withtz
  * @return string
  */
-function local_workshops_joining_details(stdClass $workshop): string {
-    $type  = (string)$workshop->deliverytype;
+function local_workshops_format_when(int $start, int $end, $tz, bool $withtz = true): string {
+    if (!$start) {
+        return '';
+    }
+    $out = userdate($start, get_string('strftimedaydatetime', 'langconfig'), $tz);
+    if ($end) {
+        $sameday = userdate($start, '%Y%m%d', $tz) === userdate($end, '%Y%m%d', $tz);
+        $out .= ' - ' . userdate($end, get_string($sameday ? 'strftimetime' : 'strftimedaydatetime', 'langconfig'), $tz);
+    }
+    if ($withtz) {
+        $out .= ' (' . core_date::get_localised_timezone($tz) . ')';
+    }
+    return $out;
+}
+
+/**
+ * Plain-text connection lines for one session (link, platform, ID, passcode).
+ *
+ * @param stdClass $session From local_workshops_get_sessions().
+ * @return string[]
+ */
+function local_workshops_connection_lines(stdClass $session): array {
     $lines = [];
+    if ($session->meetingurl !== '') {
+        $lines[] = 'Join the meeting:';
+        $lines[] = $session->meetingurl;
+    }
+    if ($session->platform !== '') {
+        $lines[] = 'Platform: ' . $session->platform;
+    }
+    if ($session->meetingid !== '') {
+        $lines[] = 'Meeting ID: ' . $session->meetingid;
+    }
+    if ($session->passcode !== '') {
+        $lines[] = 'Passcode: ' . $session->passcode;
+    }
+    return $lines;
+}
+
+/**
+ * Plain-text venue lines (Face-to-Face / Hybrid).
+ *
+ * @param stdClass $workshop
+ * @return string[]
+ */
+function local_workshops_venue_lines(stdClass $workshop): array {
+    $lines = [];
+    if (!empty($workshop->venue)) {
+        $lines[] = 'Venue: ' . $workshop->venue;
+    }
+    if (!empty($workshop->room)) {
+        $lines[] = 'Room: ' . $workshop->room;
+    }
+    if (!empty($workshop->address)) {
+        $lines[] = 'Address: ' . str_replace(["\r\n", "\r", "\n"], ', ', trim($workshop->address));
+    }
+    return $lines;
+}
+
+/**
+ * Plain-text joining details for a workshop. One session: link, platform,
+ * meeting ID and passcode. Several sessions: a block per session with its
+ * date/time and connection details. Venue/room/address are added for
+ * Face-to-Face and Hybrid. Empty fields are left out.
+ *
+ * @param stdClass $workshop
+ * @param string|float|int $tz Time zone for multi-session times.
+ * @return string
+ */
+function local_workshops_joining_details(stdClass $workshop, $tz = 99): string {
+    $type   = (string)$workshop->deliverytype;
+    $blocks = [];
     if ($type !== 'Face-to-Face') {
-        if (!empty($workshop->teamslink)) {
-            $lines[] = 'Join the meeting:';
-            $lines[] = $workshop->teamslink;
-        }
-        if (!empty($workshop->webinarplatform)) {
-            $lines[] = 'Platform: ' . $workshop->webinarplatform;
-        }
-        if (!empty($workshop->webinarmeetingid)) {
-            $lines[] = 'Meeting ID: ' . $workshop->webinarmeetingid;
-        }
-        if (!empty($workshop->webinarpasscode)) {
-            $lines[] = 'Passcode: ' . $workshop->webinarpasscode;
+        $sessions = local_workshops_get_sessions($workshop);
+        if (count($sessions) === 1) {
+            $blocks[] = implode("\n", local_workshops_connection_lines($sessions[0]));
+        } else {
+            $total = count($sessions);
+            foreach ($sessions as $i => $sess) {
+                $lines = ['Session ' . ($i + 1) . ' of ' . $total . ': '
+                    . local_workshops_format_when($sess->startdatetime, $sess->enddatetime, $tz, false)];
+                $blocks[] = implode("\n", array_merge($lines, local_workshops_connection_lines($sess)));
+            }
         }
     }
     if ($type !== 'Webinar') {
-        if ($lines) {
-            $lines[] = '';
-        }
-        if (!empty($workshop->venue)) {
-            $lines[] = 'Venue: ' . $workshop->venue;
-        }
-        if (!empty($workshop->room)) {
-            $lines[] = 'Room: ' . $workshop->room;
-        }
-        if (!empty($workshop->address)) {
-            $lines[] = 'Address: ' . str_replace(["\r\n", "\r", "\n"], ', ', trim($workshop->address));
-        }
+        $blocks[] = implode("\n", local_workshops_venue_lines($workshop));
     }
-    return trim(implode("\n", $lines));
+    return trim(implode("\n\n", array_filter($blocks, function($b) {
+        return trim($b) !== '';
+    })));
+}
+
+/**
+ * Escape a value for an iCalendar TEXT property.
+ *
+ * @param string $value
+ * @return string
+ */
+function local_workshops_ics_escape(string $value): string {
+    $value = str_replace(["\r\n", "\r"], "\n", $value);
+    return str_replace(['\\', ';', ',', "\n"], ['\\\\', '\;', '\\,', '\\n'], $value);
+}
+
+/**
+ * Fold an iCalendar content line at 75 octets (RFC 5545 3.1), UTF-8 safe.
+ *
+ * @param string $line
+ * @return string
+ */
+function local_workshops_ics_fold(string $line): string {
+    $out = '';
+    $current = '';
+    $limit = 75;
+    foreach (preg_split('//u', $line, -1, PREG_SPLIT_NO_EMPTY) as $char) {
+        if (strlen($current) + strlen($char) > $limit) {
+            $out .= $current . "\r\n ";
+            $current = '';
+            $limit = 74; // Continuation lines start with a space.
+        }
+        $current .= $char;
+    }
+    return $out . $current . "\r\n";
+}
+
+/**
+ * Build an .ics calendar file with one event per dated session.
+ *
+ * UIDs are stable per workshop/session and SEQUENCE rises each time the
+ * workshop is saved, so re-sending updates the existing calendar entry rather
+ * than adding a duplicate (in clients that honour UID/SEQUENCE).
+ *
+ * @param stdClass $workshop
+ * @return string ICS content, or '' if no session has a start date.
+ */
+function local_workshops_build_ics(stdClass $workshop): string {
+    global $CFG;
+
+    $host = parse_url($CFG->wwwroot, PHP_URL_HOST) ?: 'moodle';
+    $now  = gmdate('Ymd\THis\Z');
+    $seq  = max(0, (int)$workshop->timemodified - (int)$workshop->timecreated);
+    $sessions = array_values(array_filter(local_workshops_get_sessions($workshop), function($s) {
+        return $s->startdatetime > 0;
+    }));
+    if (!$sessions) {
+        return '';
+    }
+    $total  = count($sessions);
+    $venue  = $workshop->deliverytype !== 'Webinar' ? local_workshops_venue_lines($workshop) : [];
+    $online = $workshop->deliverytype !== 'Face-to-Face';
+
+    $lines = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//LMS Hosting Services//Workshop Scheduler//EN',
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH',
+    ];
+    foreach ($sessions as $i => $sess) {
+        $start = $sess->startdatetime;
+        $end   = $sess->enddatetime > $start ? $sess->enddatetime : $start + HOURSECS;
+        $summary = $workshop->workshopname . ($total > 1 ? ' (Session ' . ($i + 1) . ' of ' . $total . ')' : '');
+
+        $desc = $online ? local_workshops_connection_lines($sess) : [];
+        if ($venue) {
+            $desc = array_merge($desc, $desc ? [''] : [], $venue);
+        }
+        $location = ($online && $sess->meetingurl !== '')
+            ? (($sess->platform !== '' ? $sess->platform . ': ' : '') . $sess->meetingurl)
+            : implode(', ', array_map(function($l) {
+                return preg_replace('/^[A-Za-z]+: /', '', $l);
+            }, $venue));
+
+        $lines[] = 'BEGIN:VEVENT';
+        $lines[] = 'UID:lw-' . (int)$workshop->id . '-s' . (int)$sess->sessionno . '@' . $host;
+        $lines[] = 'DTSTAMP:' . $now;
+        $lines[] = 'SEQUENCE:' . $seq;
+        $lines[] = 'DTSTART:' . gmdate('Ymd\THis\Z', $start);
+        $lines[] = 'DTEND:' . gmdate('Ymd\THis\Z', $end);
+        $lines[] = 'SUMMARY:' . local_workshops_ics_escape($summary);
+        if ($location !== '') {
+            $lines[] = 'LOCATION:' . local_workshops_ics_escape($location);
+        }
+        if ($desc) {
+            $lines[] = 'DESCRIPTION:' . local_workshops_ics_escape(implode("\n", $desc));
+        }
+        if ($online && $sess->meetingurl !== '') {
+            $lines[] = 'URL:' . $sess->meetingurl;
+        }
+        $lines[] = 'STATUS:CONFIRMED';
+        $lines[] = 'TRANSP:OPAQUE';
+        $lines[] = 'BEGIN:VALARM';
+        $lines[] = 'ACTION:DISPLAY';
+        $lines[] = 'DESCRIPTION:' . local_workshops_ics_escape($summary);
+        $lines[] = 'TRIGGER:-PT15M';
+        $lines[] = 'END:VALARM';
+        $lines[] = 'END:VEVENT';
+    }
+    $lines[] = 'END:VCALENDAR';
+
+    return implode('', array_map('local_workshops_ics_fold', $lines));
 }
 
 /**
@@ -788,16 +1004,37 @@ function local_workshops_send_confirmed_email(stdClass $workshop, stdClass $part
     }
 
     $tz = core_date::get_user_timezone($user);
-    $when = '';
-    if ($workshop->startdatetime) {
-        $when = userdate($workshop->startdatetime, get_string('strftimedaydatetime', 'langconfig'), $tz);
-        if ($workshop->enddatetime) {
-            $sameday = userdate($workshop->startdatetime, '%Y%m%d', $tz) === userdate($workshop->enddatetime, '%Y%m%d', $tz);
-            $when .= ' - ' . userdate($workshop->enddatetime,
-                get_string($sameday ? 'strftimetime' : 'strftimedaydatetime', 'langconfig'), $tz);
-        }
-        $when .= ' (' . core_date::get_localised_timezone($tz) . ')';
+    $sessions = local_workshops_get_sessions($workshop);
+    if (count($sessions) > 1) {
+        $last = end($sessions);
+        $when = count($sessions) . ' sessions, '
+            . userdate($sessions[0]->startdatetime, get_string('strftimedate', 'langconfig'), $tz) . ' to '
+            . userdate($last->startdatetime, get_string('strftimedate', 'langconfig'), $tz)
+            . ' (times in ' . core_date::get_localised_timezone($tz) . ', see below)';
+    } else {
+        $when = local_workshops_format_when((int)$workshop->startdatetime, (int)$workshop->enddatetime, $tz);
     }
+
+    // Calendar file (.ics) with one event per session.
+    $icspath = '';
+    $icsname = '';
+    if (get_config('local_workshops', 'confirmedemailics') !== '0') {
+        $ics = local_workshops_build_ics($workshop);
+        if ($ics !== '') {
+            $dir = make_temp_directory('local_workshops');
+            $icspath = $dir . '/' . uniqid('invite_', true) . '.ics';
+            if (file_put_contents($icspath, $ics) === false) {
+                $icspath = '';
+            } else {
+                $icsname = clean_filename(($workshop->workshopcode ?: 'workshop') . '.ics');
+            }
+        }
+    }
+    $calendarnote = $icspath !== ''
+        ? (count($sessions) > 1
+            ? 'A calendar file is attached. Open it to add all ' . count($sessions) . ' sessions to your calendar.'
+            : 'A calendar file is attached. Open it to add this session to your calendar.')
+        : '';
 
     $coursename = '';
     $courseurl  = '';
@@ -817,7 +1054,8 @@ function local_workshops_send_confirmed_email(stdClass $workshop, stdClass $part
         '{workshopdate}'   => $workshop->startdatetime
             ? userdate($workshop->startdatetime, get_string('strftimedate', 'langconfig'), $tz) : '',
         '{workshopwhen}'   => $when,
-        '{joiningdetails}' => local_workshops_joining_details($workshop),
+        '{joiningdetails}' => local_workshops_joining_details($workshop, $tz),
+        '{calendarnote}'   => $calendarnote,
         '{meetingurl}'     => (string)$workshop->teamslink,
         '{platform}'       => (string)$workshop->webinarplatform,
         '{meetingid}'      => (string)$workshop->webinarmeetingid,
@@ -839,16 +1077,20 @@ function local_workshops_send_confirmed_email(stdClass $workshop, stdClass $part
     }
     $subject = strtr($subject, $replace);
     $text    = strtr(str_replace("\r\n", "\n", $body), $replace);
+    $text    = preg_replace("/\n{3,}/", "\n\n", $text); // Tidy gaps left by empty placeholders.
 
     $html = nl2br(s($text));
     $html = preg_replace('~(https?://[^\s<]+)~', '<a href="$1">$1</a>', $html);
 
     try {
         $from = core_user::get_support_user();
-        $ok = email_to_user($user, $from, $subject, $text, $html);
+        $ok = email_to_user($user, $from, $subject, $text, $html, $icspath, $icsname);
     } catch (Throwable $e) {
         debugging('local_workshops confirmed email failed: ' . $e->getMessage(), DEBUG_DEVELOPER);
         $ok = false;
+    }
+    if ($icspath !== '') {
+        @unlink($icspath);
     }
     if (!$ok) {
         return ['code' => 'failed', 'message' => "$name: confirmation email could not be sent."];
