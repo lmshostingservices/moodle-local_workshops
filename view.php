@@ -240,6 +240,14 @@ if ($tab === 'participants') {
         }
         if (!empty($participants)) {
             echo '<form method="post" action="' . (new moodle_url('/local/workshops/sendconfirmation.php'))->out() . '" style="display:inline"'
+               . ' onsubmit="return confirm(' . s(json_encode(get_string('sendwelcome_confirm', 'local_workshops'))) . ');">'
+               . '<input type="hidden" name="workshopid" value="' . $id . '">'
+               . '<input type="hidden" name="type" value="welcome">'
+               . '<input type="hidden" name="sesskey" value="' . sesskey() . '">'
+               . '<button type="submit" class="btn btn-outline-primary btn-sm" '
+               . 'title="' . s(get_string('sendwelcome_help', 'local_workshops')) . '">'
+               . get_string('sendwelcome', 'local_workshops') . '</button></form>';
+            echo '<form method="post" action="' . (new moodle_url('/local/workshops/sendconfirmation.php'))->out() . '" style="display:inline"'
                . ' onsubmit="return confirm(' . s(json_encode(get_string('sendjoiningdetails_confirm', 'local_workshops'))) . ');">'
                . '<input type="hidden" name="workshopid" value="' . $id . '">'
                . '<input type="hidden" name="sesskey" value="' . sesskey() . '">'

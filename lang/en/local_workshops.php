@@ -283,7 +283,7 @@ $string['confirmedemail'] = 'Email participants when Confirmed';
 $string['confirmedemail_desc'] = 'Send the email below when a booking is changed to Confirmed.';
 $string['confirmedemailsubject'] = 'Email subject';
 $string['confirmedemailbody'] = 'Email body';
-$string['confirmedemail_placeholders'] = 'Placeholders: {firstname}, {lastname}, {fullname}, {username}, {workshopname}, {workshopdate}, {workshopwhen} (date, start-end time and time zone; for multi-session workshops the date range), {joiningdetails} (link, platform, meeting ID, passcode and/or venue; for multi-session workshops a block per session with its date and time), {calendarnote} (a line about the attached calendar file, blank if none), {meetingurl}, {platform}, {meetingid}, {passcode}, {coursename}, {courseurl}, {loginurl}, {sitename}. Plain text; links become clickable.';
+$string['confirmedemail_placeholders'] = 'Placeholders: {firstname}, {lastname}, {fullname}, {username}, {workshopname}, {workshopdate}, {workshopwhen} (date, start-end time and time zone; for multi-session workshops the date range), {joiningdetails} (link, platform, meeting ID, passcode and/or venue; for multi-session workshops a block per session with its date and time), {calendarnote} ("Add to calendar" link, and a note that the file is attached; blank if calendar files are off), {calendarlink} (the "Add to calendar" link on its own), {meetingurl}, {platform}, {meetingid}, {passcode}, {coursename}, {courseurl}, {loginurl}, {sitename}. Plain text; links become clickable.';
 $string['confirmedemailsubject_default'] = 'Confirmed: {workshopname} - joining details';
 $string['confirmedemailbody_default'] = 'Hi {firstname},
 
@@ -314,14 +314,14 @@ $string['sessionneedsstart'] = 'Set a start date and time for this session, or c
 $string['session1needsstart'] = 'Set the Start Date & Time (Session 1) when adding further sessions.';
 $string['sessionorder'] = 'This session must start after the previous session.';
 $string['endbeforestart'] = 'The end must be after the start.';
-$string['confirmedemailics'] = 'Attach a calendar file';
-$string['confirmedemailics_desc'] = 'Attach an .ics calendar file with one entry per session (date, time, meeting link, meeting ID, passcode and a 15-minute reminder). Participants open it to add the session(s) to Outlook, Google or Apple Calendar. Re-sending with "Email joining details" updates the existing entries in most calendars.';
+$string['confirmedemailics'] = 'Include a calendar file';
+$string['confirmedemailics_desc'] = 'Include an "Add to calendar" link in the email and attach the same .ics calendar file with one entry per session (date, time, meeting link, meeting ID, passcode and a 15-minute reminder). Participants open it to add the session(s) to Outlook, Google or Apple Calendar. Re-sending with "Email joining details" updates the existing entries in most calendars.';
 
 // v1.0.42: Booked (welcome) email.
 $string['bookedemail_heading'] = 'Booking welcome email';
-$string['bookedemail_heading_desc'] = 'When a booking changes to Booked (Add/Edit participant, CSV import, or Enrol from Group with course enrolment), the participant is emailed the workshop date, course link and their username. Not sent when a Confirmed or Attended booking is moved back to Booked. Needs a linked course and a Moodle account. <strong>Turn off Moodle\'s own welcome message in the linked course</strong> (Participants > Enrolment methods > Manual enrolments > Edit > Send course welcome message: No), otherwise participants receive two welcome emails. New accounts still receive Moodle\'s separate login details email.';
+$string['bookedemail_heading_desc'] = 'When a participant first gets a place - added as Booked, Confirmed or Attended, or moved from Waitlisted or Cancelled to one of those (Add/Edit participant, CSV import, or Enrol from Group with course enrolment) - they are emailed the workshop date, course link and their username. Sent before the Confirmed email, so people added straight as Confirmed get both. Not sent again when moving between Booked, Confirmed and Attended. Use "Email welcome details" on the Participants tab to send it to people already on the list. Needs a linked course and a Moodle account. <strong>Turn off Moodle\'s own welcome message in the linked course</strong> (Participants > Enrolment methods > Manual enrolments > Edit > Send course welcome message: No), otherwise participants receive two welcome emails. New accounts still receive Moodle\'s separate login details email.';
 $string['bookedemail'] = 'Email participants when Booked';
-$string['bookedemail_desc'] = 'Send the welcome email below when a booking is changed to Booked.';
+$string['bookedemail_desc'] = 'Send the welcome email below when a participant first gets a place on a workshop.';
 $string['bookedemailsubject'] = 'Email subject';
 $string['bookedemailbody'] = 'Email body';
 $string['bookedemail_placeholders'] = 'Placeholders: {firstname}, {lastname}, {fullname}, {username}, {email}, {workshopname}, {workshopdate} (date, or each date for multi-session workshops), {workshopwhen} (date, time and time zone), {coursename}, {courseurl}, {loginurl}, {forgotpasswordurl}, {sitename}. Plain text; links become clickable.';
@@ -342,3 +342,8 @@ If this is your first time logging in, your login details are emailed to you sep
 
 Kind regards,
 {sitename}';
+
+// v1.0.43.
+$string['sendwelcome'] = 'Email welcome details';
+$string['sendwelcome_help'] = 'Email the welcome details (course link, username and workshop date) to every Booked and Confirmed participant. Use for people added before the welcome email was set up.';
+$string['sendwelcome_confirm'] = 'Email the welcome details to every Booked and Confirmed participant now?';

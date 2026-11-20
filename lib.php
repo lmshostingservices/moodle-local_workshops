@@ -856,7 +856,7 @@ function local_workshops_joining_details(stdClass $workshop, $tz = 99): string {
     if ($type !== 'Webinar') {
         $blocks[] = implode("\n", local_workshops_venue_lines($workshop));
     }
-    return trim(implode("\n\n", array_filter($blocks, function($b) {
+    return trim(implode("\n\n", array_filter($blocks, function ($b) {
         return trim($b) !== '';
     })));
 }
@@ -909,7 +909,7 @@ function local_workshops_build_ics(stdClass $workshop): string {
     $host = parse_url($CFG->wwwroot, PHP_URL_HOST) ?: 'moodle';
     $now  = gmdate('Ymd\THis\Z');
     $seq  = max(0, (int)$workshop->timemodified - (int)$workshop->timecreated);
-    $sessions = array_values(array_filter(local_workshops_get_sessions($workshop), function($s) {
+    $sessions = array_values(array_filter(local_workshops_get_sessions($workshop), function ($s) {
         return $s->startdatetime > 0;
     }));
     if (!$sessions) {
@@ -937,7 +937,7 @@ function local_workshops_build_ics(stdClass $workshop): string {
         }
         $location = ($online && $sess->meetingurl !== '')
             ? (($sess->platform !== '' ? $sess->platform . ': ' : '') . $sess->meetingurl)
-            : implode(', ', array_map(function($l) {
+            : implode(', ', array_map(function ($l) {
                 return preg_replace('/^[A-Za-z]+: /', '', $l);
             }, $venue));
 
@@ -1007,26 +1007,28 @@ function local_workshops_send_confirmed_email(stdClass $workshop, stdClass $part
     $sessions = local_workshops_get_sessions($workshop);
     $when = local_workshops_when_summary($workshop, $tz);
 
-    // Calendar file (.ics) with one event per session.
+    // Calendar: a download link (works even when mail filters strip attachments)
+    // plus the same .ics attached to the email.
     $icspath = '';
     $icsname = '';
+    $calendarlink = '';
+    $calendarnote = '';
     if (get_config('local_workshops', 'confirmedemailics') !== '0') {
         $ics = local_workshops_build_ics($workshop);
         if ($ics !== '') {
-            $dir = make_temp_directory('local_workshops');
-            $icspath = $dir . '/' . uniqid('invite_', true) . '.ics';
-            if (file_put_contents($icspath, $ics) === false) {
-                $icspath = '';
-            } else {
+            $calendarlink = local_workshops_calendar_url($workshop)->out(false);
+            $icspath = local_workshops_write_ics_tempfile($ics);
+            if ($icspath !== '') {
                 $icsname = clean_filename(($workshop->workshopcode ?: 'workshop') . '.ics');
             }
+            $n = count(array_filter($sessions, function ($x) {
+                return $x->startdatetime > 0;
+            }));
+            $what = $n > 2 ? 'all ' . $n . ' sessions' : ($n === 2 ? 'both sessions' : 'this session');
+            $calendarnote = 'Add ' . $what . ' to your calendar:' . "\n" . $calendarlink
+                . ($icspath !== '' ? "\n" . '(The same calendar file is also attached to this email.)' : '');
         }
     }
-    $calendarnote = $icspath !== ''
-        ? (count($sessions) > 1
-            ? 'A calendar file is attached. Open it to add all ' . count($sessions) . ' sessions to your calendar.'
-            : 'A calendar file is attached. Open it to add this session to your calendar.')
-        : '';
 
     $coursename = '';
     $courseurl  = '';
@@ -1048,6 +1050,7 @@ function local_workshops_send_confirmed_email(stdClass $workshop, stdClass $part
         '{workshopwhen}'   => $when,
         '{joiningdetails}' => local_workshops_joining_details($workshop, $tz),
         '{calendarnote}'   => $calendarnote,
+        '{calendarlink}'   => $calendarlink,
         '{meetingurl}'     => (string)$workshop->teamslink,
         '{platform}'       => (string)$workshop->webinarplatform,
         '{meetingid}'      => (string)$workshop->webinarmeetingid,
@@ -1081,9 +1084,8 @@ function local_workshops_send_confirmed_email(stdClass $workshop, stdClass $part
         debugging('local_workshops confirmed email failed: ' . $e->getMessage(), DEBUG_DEVELOPER);
         $ok = false;
     }
-    if ($icspath !== '') {
-        @unlink($icspath);
-    }
+    // The temp file is not deleted here: if mail is queued it is read after this
+    // call. local_workshops_write_ics_tempfile() clears files older than a day.
     if (!$ok) {
         return ['code' => 'failed', 'message' => "$name: confirmation email could not be sent."];
     }
@@ -1135,7 +1137,8 @@ function local_workshops_date_summary(stdClass $workshop, $tz): string {
 }
 
 /**
- * Welcome email when a booking becomes Booked: workshop date, course link,
+ * Welcome email when a participant first gets a place (see
+ * local_workshops_is_welcome_transition()): workshop date, course link,
  * username and password-reset link. Replaces Moodle's manual-enrolment
  * course welcome message (turn that off in the course to avoid two emails).
  *
@@ -1144,14 +1147,15 @@ function local_workshops_date_summary(stdClass $workshop, $tz): string {
  *
  * @param stdClass $workshop    local_workshops record.
  * @param stdClass $participant local_workshop_participants record (after sync).
+ * @param bool     $force       Send even if the setting is off (manual resend).
  * @return array ['code' => sent|disabled|nocourse|nouser|failed, 'message' => string]
  */
-function local_workshops_send_booked_email(stdClass $workshop, stdClass $participant): array {
+function local_workshops_send_booked_email(stdClass $workshop, stdClass $participant, bool $force = false): array {
     global $DB, $SITE;
 
     $name = trim($participant->firstname . ' ' . $participant->lastname);
 
-    if (!get_config('local_workshops', 'bookedemail')) {
+    if (!$force && !get_config('local_workshops', 'bookedemail')) {
         return ['code' => 'disabled', 'message' => ''];
     }
     $course = !empty($workshop->courseid) ? $DB->get_record('course', ['id' => $workshop->courseid]) : null;
@@ -1208,4 +1212,120 @@ function local_workshops_send_booked_email(stdClass $workshop, stdClass $partici
         return ['code' => 'failed', 'message' => "$name: welcome email could not be sent."];
     }
     return ['code' => 'sent', 'message' => "$name: welcome email sent."];
+}
+
+/**
+ * Write an .ics file to Moodle's temp directory for attaching to an email.
+ * Files are kept for a day (so queued mail can still read them), then
+ * removed on a later call.
+ *
+ * @param string $ics
+ * @return string Absolute path, or '' on failure.
+ */
+function local_workshops_write_ics_tempfile(string $ics): string {
+    $dir = make_temp_directory('local_workshops/ics');
+    foreach (glob($dir . '/*.ics') ?: [] as $old) {
+        if (@filemtime($old) < time() - DAYSECS) {
+            @unlink($old);
+        }
+    }
+    $path = $dir . '/invite_' . random_string(20) . '.ics';
+    return file_put_contents($path, $ics) === false ? '' : $path;
+}
+
+/**
+ * Secret used to sign public calendar links (created on first use).
+ *
+ * @return string
+ */
+function local_workshops_calendar_secret(): string {
+    $secret = (string)get_config('local_workshops', 'calendarsecret');
+    if (strlen($secret) < 32) {
+        $secret = random_string(48);
+        set_config('calendarsecret', $secret, 'local_workshops');
+    }
+    return $secret;
+}
+
+/**
+ * Token for a workshop's public calendar link.
+ *
+ * @param int $workshopid
+ * @return string
+ */
+function local_workshops_calendar_token(int $workshopid): string {
+    return substr(hash_hmac('sha256', 'ics:' . $workshopid, local_workshops_calendar_secret()), 0, 32);
+}
+
+/**
+ * Public "Add to calendar" link (no login needed) that downloads the
+ * workshop's current .ics, so it always reflects the latest sessions.
+ * Served by local_workshops_pluginfile() (filearea "calendar").
+ *
+ * @param stdClass $workshop
+ * @return moodle_url
+ */
+function local_workshops_calendar_url(stdClass $workshop): moodle_url {
+    return moodle_url::make_pluginfile_url(
+        context_system::instance()->id,
+        'local_workshops',
+        'calendar',
+        (int)$workshop->id,
+        '/' . local_workshops_calendar_token((int)$workshop->id) . '/',
+        clean_filename(($workshop->workshopcode ?: 'workshop') . '.ics')
+    );
+}
+
+/**
+ * Serve plugin files.
+ *
+ * Filearea "calendar": the workshop's sessions as an .ics file, for the
+ * "Add to calendar" link in the Confirmed email. Participants may not have
+ * logged in yet, so access is by a signed per-workshop token instead of a
+ * login. The file holds the same details as the email and is built fresh on
+ * each request. URL args: {workshopid}/{token}/{filename}.ics
+ *
+ * @param stdClass $course
+ * @param stdClass|null $cm
+ * @param context $context
+ * @param string $filearea
+ * @param array $args
+ * @param bool $forcedownload
+ * @param array $options
+ * @return bool false if the file is not found; otherwise the file is sent and the script ends.
+ */
+function local_workshops_pluginfile($course, $cm, $context, $filearea, $args, $forcedownload, array $options = []) {
+    global $DB;
+
+    if ($context->contextlevel != CONTEXT_SYSTEM || $filearea !== 'calendar' || count($args) < 3) {
+        return false;
+    }
+    $workshopid = (int)array_shift($args);
+    $token = clean_param((string)array_shift($args), PARAM_ALPHANUM);
+
+    $workshop = $DB->get_record('local_workshops', ['id' => $workshopid]);
+    if (!$workshop || !hash_equals(local_workshops_calendar_token($workshopid), $token)) {
+        return false;
+    }
+    $ics = local_workshops_build_ics($workshop);
+    if ($ics === '') {
+        return false;
+    }
+    $filename = clean_filename(($workshop->workshopcode ?: 'workshop') . '.ics');
+    send_file($ics, $filename, 0, 0, true, true, 'text/calendar', false, ['cacheability' => 'private']);
+    return true;
+}
+
+/**
+ * Should a status change trigger the welcome (Booked) email? True when the
+ * participant newly gets a place: from nothing, Waitlisted or Cancelled to
+ * Booked, Confirmed or Attended.
+ *
+ * @param string $from Previous status ('' for a new participant).
+ * @param string $to   New status.
+ * @return bool
+ */
+function local_workshops_is_welcome_transition(string $from, string $to): bool {
+    return in_array($to, ['Booked', 'Confirmed', 'Attended'], true)
+        && in_array($from, ['', 'Waitlisted', 'Cancelled'], true);
 }

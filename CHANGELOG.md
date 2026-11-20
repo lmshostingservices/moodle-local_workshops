@@ -3,6 +3,18 @@
 All notable changes to local_workshops (Workshop Scheduler) are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [v1.0.43] - 2026-11-19
+
+### Fixed
+- **Welcome email not received.** It was only sent when a status changed *to Booked*, so participants added straight as Confirmed or Attended, or already on the list before v1.0.42, never got it. It is now sent the first time a participant gets a place: added as Booked, Confirmed or Attended, or moved from Waitlisted or Cancelled to one of those. It goes out before the Confirmed email, so someone added as Confirmed receives both. Enrol from Group now says when welcome emails were skipped because "Also enrol members into the linked Moodle course" was unticked.
+- **Calendar file missing from the Confirmed email.** The .ics was created and passed to Moodle but did not arrive (typically stripped by an email security filter, or lost if mail is queued, because the temp file was deleted straight after sending). The email now includes an **Add to calendar** link that downloads the calendar file from the site, so it works even when attachments are blocked. The file is still attached as well, and the temp file is now kept for a day before cleanup. The link is served through Moodle's pluginfile.php (local_workshops_pluginfile, filearea "calendar"), needs no login, is signed with a per-workshop token, and always serves the current sessions.
+- "Add all 2 sessions" now reads "Add both sessions".
+
+### Added
+- **Email welcome details** button on the Participants tab: sends the welcome email to every Booked and Confirmed participant (links or creates their account first if needed).
+- New placeholder {calendarlink}. "Attach a calendar file" setting renamed "Include a calendar file" (covers the link and the attachment).
+- No database schema change.
+
 ## [v1.0.42] - 2026-11-18
 
 ### Added

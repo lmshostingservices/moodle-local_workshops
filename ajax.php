@@ -110,8 +110,10 @@ try {
                 $message .= ' ' . $sync['message'];
             }
 
-            // Newly Booked (new booking, or from Waitlisted/Cancelled/No Show): welcome email.
-            if ($rec->bookingstatus === 'Booked' && !in_array($previousstatus, ['Booked', 'Confirmed', 'Attended'], true)) {
+            // Welcome email the first time someone gets a place (Booked, Confirmed or Attended),
+            // i.e. a new participant or one moved off Waitlisted/Cancelled. Sent before the
+            // Confirmed/Attended emails so participants added straight as Confirmed still get it.
+            if (local_workshops_is_welcome_transition($previousstatus, $rec->bookingstatus)) {
                 $mail = local_workshops_send_booked_email($workshop, $rec);
                 if ($mail['message'] !== '') {
                     $message .= ' ' . $mail['message'];
@@ -506,15 +508,16 @@ try {
                 if ($enrolcourse) {
                     local_workshops_sync_participant($workshop, $prec);
                 }
+                if ($enrolcourse && local_workshops_is_welcome_transition('', $bookingstatus)) {
+                    $mail = local_workshops_send_booked_email($workshop, $prec);
+                    if ($mail['code'] === 'sent') {
+                        $welcomeemailed++;
+                    }
+                }
                 if ($bookingstatus === 'Attended') {
                     $mail = local_workshops_send_attended_email($workshop, $prec);
                     if ($mail['code'] === 'sent') {
                         $emailed++;
-                    }
-                } else if ($bookingstatus === 'Booked' && $enrolcourse) {
-                    $mail = local_workshops_send_booked_email($workshop, $prec);
-                    if ($mail['code'] === 'sent') {
-                        $welcomeemailed++;
                     }
                 } else if ($bookingstatus === 'Confirmed') {
                     $mail = local_workshops_send_confirmed_email($workshop, $prec);
@@ -535,6 +538,8 @@ try {
             }
             if ($welcomeemailed > 0) {
                 $msg .= ', welcome email sent to ' . $welcomeemailed;
+            } else if (!$enrolcourse && $added > 0 && get_config('local_workshops', 'bookedemail')) {
+                $msg .= '. Welcome emails not sent - tick "Also enrol members into the linked Moodle course" to send them';
             }
             if ($confirmedemailed > 0) {
                 $msg .= ', joining details emailed to ' . $confirmedemailed;
